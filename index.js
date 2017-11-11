@@ -6,7 +6,8 @@ const pool = require('mysql').createPool({
   host     : 'localhost',
   user     : 'antipro',
   password : '385471c54e',
-  database : 'sharelist'
+  database : 'sharelist',
+  multipleStatements: true
 })
 
 app.all("*", function (req, res, next) {
@@ -54,23 +55,39 @@ io.on('connection', (socket) => {
   let uid = socket.handshake.query.uid
   console.log('user %d connected', uid)
 
-  pool.query('SELECT id, uid, content, pid, DATE_FORMAT(ctime, \'%Y-%m-%d %H:%i:%s\') AS ctime, DATE_FORMAT(notify_date, \'%Y-%m-%d\') AS notify_date FROM items WHERE uid = ?', [ uid ], (err, rows, fields) => {
-    if (err) {
-      console.log(err)
-      socket.emit('error', '查询条目出错')
-      return
-    }
-    socket.emit('items', rows)
-  })
-
-  pool.query('SELECT id, uid, name, DATE_FORMAT(ctime, \'%Y-%m-%d %H:%i:%s\') AS ctime, editable FROM projects WHERE uid = ?', [ uid ], (err, rows, fields) => {
+  let sql1 = 'SELECT id, uid, content, pid, DATE_FORMAT(ctime, \'%Y-%m-%d %H:%i:%s\') AS ctime, DATE_FORMAT(notify_date, \'%Y-%m-%d\') AS notify_date FROM items WHERE uid = ' + uid
+  let sql2 = 'SELECT id, uid, name, DATE_FORMAT(ctime, \'%Y-%m-%d %H:%i:%s\') AS ctime, editable FROM projects WHERE uid = ' + uid
+  pool.query(sql1 + ';' + sql2, (err, results, fields) => {
     if (err) {
       console.log(err)
       socket.emit('error', '查询项目出错')
       return
     }
-    socket.emit('projects', rows)
+    let items = results[0]
+    let projects = results[1]
+    socket.emit('init', {
+      items,
+      projects
+    })
   });
+
+  // pool.query('SELECT id, uid, content, pid, DATE_FORMAT(ctime, \'%Y-%m-%d %H:%i:%s\') AS ctime, DATE_FORMAT(notify_date, \'%Y-%m-%d\') AS notify_date FROM items WHERE uid = ?', [ uid ], (err, rows, fields) => {
+  //   if (err) {
+  //     console.log(err)
+  //     socket.emit('error', '查询条目出错')
+  //     return
+  //   }
+  //   socket.emit('items', rows)
+  // })
+
+  // pool.query('SELECT id, uid, name, DATE_FORMAT(ctime, \'%Y-%m-%d %H:%i:%s\') AS ctime, editable FROM projects WHERE uid = ?', [ uid ], (err, rows, fields) => {
+  //   if (err) {
+  //     console.log(err)
+  //     socket.emit('error', '查询项目出错')
+  //     return
+  //   }
+  //   socket.emit('projects', rows)
+  // });
   
   /**
    * 新增条目

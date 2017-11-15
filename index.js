@@ -56,10 +56,10 @@ io.on('connection', (socket) => {
   console.log('user %d connected', uid)
 
   let sql1 = `SELECT id, uid, content, pid, state, DATE_FORMAT(ctime, \'%Y-%m-%d %H:%i:%s\') AS ctime, DATE_FORMAT(notify_date, \'%Y-%m-%d\') AS notify_date 
-      FROM items WHERE uid = ${uid} AND state <> 2
+      FROM tasks WHERE uid = ${uid} AND state <> 2
       UNION
       SELECT b.id, b.uid, b.content, b.pid, b.state, DATE_FORMAT(b.ctime, \'%Y-%m-%d %H:%i:%s\') AS ctime, DATE_FORMAT(b.notify_date, \'%Y-%m-%d\') AS notify_date 
-      FROM shares a, items b WHERE a.uid = ${uid} AND a.pid = b.pid AND b.state <> 2`
+      FROM shares a, tasks b WHERE a.uid = ${uid} AND a.pid = b.pid AND b.state <> 2`
   let sql2 = `SELECT id AS id, uid, name, DATE_FORMAT(ctime, \'%Y-%m-%d %H:%i:%s\') AS ctime, editable, \'\' AS control 
       FROM projects WHERE uid = ${uid}
       UNION 
@@ -71,13 +71,13 @@ io.on('connection', (socket) => {
       socket.emit('error', '查询项目出错')
       return
     }
-    let items = results[0]
+    let tasks = results[0]
     let projects = results[1]
     projects.forEach(project => {
       socket.join('project ' + project.id)
     });
     socket.emit('init', {
-      items,
+      tasks,
       projects
     }) 
   })
@@ -85,22 +85,22 @@ io.on('connection', (socket) => {
   /**
    * 新增条目
    */
-  socket.on('additem', ({ pid, uid, content }) => {
-    pool.query('INSERT INTO items SET ?', { uid, pid, content }, (err, results, fields) => {
+  socket.on('addtask', ({ pid, uid, content }) => {
+    pool.query('INSERT INTO tasks SET ?', { uid, pid, content }, (err, results, fields) => {
       if (err) {
         console.log(err)
         socket.emit('error', '新增条目出错')
         return
       }
       let id = results.insertId
-      pool.query('SELECT id, uid, content, pid, state, DATE_FORMAT(ctime, \'%Y-%m-%d %H:%i:%s\') AS ctime, DATE_FORMAT(notify_date, \'%Y-%m-%d\') AS notify_date FROM items WHERE id = ?', id, (err, rows, fields) => {
+      pool.query('SELECT id, uid, content, pid, state, DATE_FORMAT(ctime, \'%Y-%m-%d %H:%i:%s\') AS ctime, DATE_FORMAT(notify_date, \'%Y-%m-%d\') AS notify_date FROM tasks WHERE id = ?', id, (err, rows, fields) => {
         if (err) {
           console.log(err)
           socket.emit('error', '查询条目出错')
           return
         }
         
-        socket.emit('item added', rows[0]).to('project ' + pid).emit('newitem', rows[0])
+        socket.emit('task added', rows[0]).to('project ' + pid).emit('newtask', rows[0])
       })
     })
   })
@@ -108,28 +108,28 @@ io.on('connection', (socket) => {
   /**
    * 删除条目
    */
-  socket.on('removeitem', ({ id, pid }) => {
-    pool.query('UPDATE items SET state = 2 WHERE ?', { id }, (err, results, fields) => {
+  socket.on('removetask', ({ id, pid }) => {
+    pool.query('UPDATE tasks SET state = 2 WHERE ?', { id }, (err, results, fields) => {
       if (err) {
         console.log(err)
         socket.emit('error', '移除条目出错')
         return
       }
-      socket.emit('item removed', id).to('project ' + pid).emit('item removed', id)
+      socket.emit('task removed', id).to('project ' + pid).emit('task removed', id)
     })
   })
 
   /**
    * 完成条目
    */
-  socket.on('finishitem', ({ id, pid }) => {
-    pool.query('UPDATE items SET state = 1 WHERE ?', { id }, (err, results, fields) => {
+  socket.on('finishtask', ({ id, pid }) => {
+    pool.query('UPDATE tasks SET state = 1 WHERE ?', { id }, (err, results, fields) => {
       if (err) {
         console.log(err)
         socket.emit('error', '完成条目出错')
         return
       }
-      socket.emit('item finished', id).to('project ' + pid).emit('item finished', id)
+      socket.emit('task finished', id).to('project ' + pid).emit('task finished', id)
     })
   })
   

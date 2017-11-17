@@ -77,13 +77,13 @@ app.get('/api/projects/:pid', (req, res) => {
     FROM projects WHERE id = ${req.params.pid}`
   pool.promise(sql1 + ';' + sql2).then(results => {
     let tasks = results[0]
-    let projects = results[1]
+    let project = results[1][0]
     res.send({
       state: '000',
       msg: '',
       data: {
         tasks,
-        projects
+        project
       }
     })
   }).catch(err => {
@@ -108,7 +108,11 @@ io.on('connection', (socket) => {
   }
   let uid = socket.handshake.query.uid
   console.log('user %d connected', uid)
-  sockets[uid] = socket
+  if (!sockets[uid]) {
+    sockets[uid] = new Array()
+  }
+  sockets[uid].push(socket)
+  console.log(sockets)
 
   let sql1 = `SELECT id, uid, content, pid, state, DATE_FORMAT(ctime, \'%Y-%m-%d %H:%i:%s\') AS ctime, DATE_FORMAT(notify_date, \'%Y-%m-%d\') AS notify_date 
       FROM tasks WHERE uid = ${uid} AND state <> 2
@@ -190,7 +194,9 @@ io.on('connection', (socket) => {
       old_uids.forEach(uid => {
         // 收回共享
         if (new_uids.indexOf(uid) === -1 && sockets[uid]) {
-          sockets[uid].emit('project unshared', pid).leave('project ' + pid)
+          sockets[uid].forEach(s => {
+            s.emit('project unshared', pid).leave('project ' + pid)
+          })
         }
       })
       return pool.promise('DELETE FROM shares WHERE pid = ?', [ pid ])
@@ -201,7 +207,9 @@ io.on('connection', (socket) => {
         if (share.uid !== 0) {
           pool.query('INSERT INTO shares SET ?', { pid, uid: share.uid })
           if (sockets[share.uid]) {
-            sockets[share.uid].emit('project shared', pid).join('project ' + pid)
+            sockets[uid].forEach(s => {
+              s.emit('project shared', pid).join('project ' + pid)
+            })
           }
           return
         }
@@ -218,7 +226,9 @@ io.on('connection', (socket) => {
         }).then(uid =>{
           pool.query('INSERT INTO shares SET ?', { pid, uid })
           if (sockets[uid]) {
-            sockets[uid].emit('project shared', pid).join('project ' + pid)
+            sockets[uid].forEach(s => {
+              s.emit('project shared', pid).join('project ' + pid)
+            })
           }
           return uid
         })
@@ -234,7 +244,10 @@ io.on('connection', (socket) => {
    */
   socket.on('disconnect', () => {
     console.log('user %d disconnected', uid)
-    delete sockets[uid]
+    sockets[uid] = sockets[uid].filter(s => s.id !== socket.id)
+    if (sockets[uid].length === 0)
+      delete sockets[uid]
+    console.log(sockets)
   })
 })
 

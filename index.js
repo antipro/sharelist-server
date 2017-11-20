@@ -202,9 +202,7 @@ io.on('connection', (socket) => {
                 s.emit('project unshared', pid).leave('project ' + pid)
               })
             }
-            return new Promise((resolve, reject) => {
-              resolve()
-            })
+            return Promise.resolve()
           })
         }
       }))
@@ -212,40 +210,30 @@ io.on('connection', (socket) => {
       console.debug('add new user if not existed')
       return Promise.all(shares.map(share => {
         if (share.uid !== 0) {
-          return new Promise(function(resolve, reject) {
-            return resolve(share.uid)
-          })
+          return Promise.resolve(share.uid)
         } else {
           return pool.promise('SELECT id FROM users WHERE tel = ?', [ share.tel ]).then(results => {
             if (results.length === 0) {
               // 添加新用户
               return pool.promise('INSERT INTO users SET ?', { tel: share.tel }).then(results => {
-                return new Promise(function(resolve, reject) {
-                  return resolve(results.insertId)
-                })
+                return Promise.resolve(results.insertId)
               })
             } else {
-              return new Promise(function(resolve, reject) {
-                return resolve(results[0].id)
-              })
+              return Promise.resolve(results[0].id)
             }
           })
         }
       }))
     }).then(uids => {
-      console.debug('add new share relationship')
+      console.debug('add new share relationship %s', uids)
       return Promise.all(uids.map((uid) => {
         return pool.promise('SELECT 1 FROM shares WHERE pid = ? AND uid = ?', [pid, uid]).then(results => {
           if (results.length === 0) {
             return pool.promise('INSERT INTO shares SET ?', { pid, uid }).then(results => {
-              return new Promise((resolve, reject) => {
-                return resolve(uid)
-              })
+              return Promise.resolve(uid)
             })
           } else {
-            return new Promise((resolve, reject) => {
-              return resolve(uid)
-            })
+            return Promise.resolve(uid)
           }
         })
       }))

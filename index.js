@@ -188,50 +188,75 @@ io.on('connection', (socket) => {
   socket.on('updateproject', ({ pid, pname, shares }) => {
     pool.promise('UPDATE projects SET name = ? WHERE id = ?', [ pname, pid ]).then(results => {
       return pool.promise('SELECT uid FROM shares WHERE pid = ?', [ pid ])
-    }).then((results, fields) => {
+    }).then(results => {
+      console.debug('unshared project event')
       const old_uids = results.map(row => row.uid)
       const new_uids = shares.map(share => share.uid)
-      old_uids.forEach(uid => {
+      return Promise.all(old_uids.map(uid => {
         // 收回共享
-        if (new_uids.indexOf(uid) === -1 && sockets[uid]) {
-          sockets[uid].forEach(s => {
-            s.emit('project unshared', pid).leave('project ' + pid)
+        if (new_uids.indexOf(uid) === -1) {
+          console.log('unshared with %d', uid)
+          return pool.promise('DELETE FROM shares WHERE pid = ? AND uid = ?', [pid, uid]).then(results => {
+            if (sockets[uid]) {
+              sockets[uid].forEach(s => {
+                s.emit('project unshared', pid).leave('project ' + pid)
+              })
+            }
+            return new Promise((resolve, reject) => {
+              resolve()
+            })
           })
         }
-      })
-      return pool.promise('DELETE FROM shares WHERE pid = ?', [ pid ])
+      }))
     }).then(() => {
-      shares.forEach(share => {
-        console.log('share project with %s', share.tel)
-        // 老分享用户
+      console.debug('add new user if not existed')
+      return Promise.all(shares.map(share => {
         if (share.uid !== 0) {
-          pool.query('INSERT INTO shares SET ?', { pid, uid: share.uid })
-          if (sockets[share.uid]) {
-            sockets[uid].forEach(s => {
-              s.emit('project shared', pid).join('project ' + pid)
-            })
-          }
-          return
+          return new Promise(function(resolve, reject) {
+            return resolve(share.uid)
+          })
+        } else {
+          return pool.promise('SELECT id FROM users WHERE tel = ?', [ share.tel ]).then(results => {
+            if (results.length === 0) {
+              // 添加新用户
+              return pool.promise('INSERT INTO users SET ?', { tel: share.tel }).then(results => {
+                return new Promise(function(resolve, reject) {
+                  return resolve(results.insertId)
+                })
+              })
+            } else {
+              return new Promise(function(resolve, reject) {
+                return resolve(results[0].id)
+              })
+            }
+          })
         }
-        // 新分享用户
-        pool.promise('SELECT id FROM users WHERE tel = ?', [ share.tel ]).then(results => {
+      }))
+    }).then(uids => {
+      console.debug('add new share relationship')
+      return Promise.all(uids.map((uid) => {
+        return pool.promise('SELECT 1 FROM shares WHERE pid = ? AND uid = ?', [pid, uid]).then(results => {
           if (results.length === 0) {
-            // 添加新用户
-            return pool.promise('INSERT INTO users SET ?', { tel: share.tel }).then(results => {
-              return results.insertId
+            return pool.promise('INSERT INTO shares SET ?', { pid, uid }).then(results => {
+              return new Promise((resolve, reject) => {
+                return resolve(uid)
+              })
             })
           } else {
-            return results[0].id
-          }
-        }).then(uid =>{
-          pool.query('INSERT INTO shares SET ?', { pid, uid })
-          if (sockets[uid]) {
-            sockets[uid].forEach(s => {
-              s.emit('project shared', pid).join('project ' + pid)
+            return new Promise((resolve, reject) => {
+              return resolve(uid)
             })
           }
-          return uid
         })
+      }))
+    }).then(uids => {
+      console.debug('share project event')
+      uids.forEach(uid => {
+        if (sockets[uid]) {
+          sockets[uid].forEach(s => {
+            s.emit('project shared', pid).join('project ' + pid)
+          })
+        }
       })
     }).catch((err) => {
       console.error(err)

@@ -258,11 +258,9 @@ io.on('connection', (socket) => {
   socket.on('updatetask', ({ id, pid, content, notify_date }) => {
     if (notify_date === '') {
       notify_date = null
-    } else {
-      notify_date = notify_date.substr(0, 10)
     }
     console.log(id, pid, content, notify_date)
-    pool.promise('UPDATE tasks SET content = ?, notify_date = DATE_ADD(?, INTERVAL 1 DAY) WHERE id = ?', [content, notify_date, id]).then(results => {
+    pool.promise('UPDATE tasks SET content = ?, notify_date = ? WHERE id = ?', [content, notify_date, id]).then(results => {
       socket.emit('task updated', {
         id,
         content,

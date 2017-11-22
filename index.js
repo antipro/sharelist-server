@@ -150,7 +150,7 @@ io.on('connection', (socket) => {
                             DATE_FORMAT(notify_date, \'%Y-%m-%d\') AS notify_date 
                             FROM tasks WHERE id = ?`, id)
     }).then((results, fields) => {
-      socket.emit('task added', results[0]).to('project ' + pid).emit('newtask', results[0])
+      socket.emit('task added', results[0]).to('project ' + pid).emit('task added', results[0])
     }).catch((err) => {
       console.error(err)
       socket.emit('error event', '新增任务出错')
@@ -249,6 +249,32 @@ io.on('connection', (socket) => {
     }).catch((err) => {
       console.error(err)
       socket.emit('error event', '更新项目出错')
+    })
+  })
+
+  /**
+   * 更新任务
+   */
+  socket.on('updatetask', ({ id, pid, content, notify_date }) => {
+    if (notify_date === '') {
+      notify_date = null
+    } else {
+      notify_date = notify_date.substr(0, 10)
+    }
+    console.log(id, pid, content, notify_date)
+    pool.promise('UPDATE tasks SET content = ?, notify_date = DATE_ADD(?, INTERVAL 1 DAY) WHERE id = ?', [content, notify_date, id]).then(results => {
+      socket.emit('task updated', {
+        id,
+        content,
+        notify_date
+      }).to('project ' + pid).emit('task updated', {
+        id,
+        content,
+        notify_date
+      })
+    }).catch(err => {
+      console.error(err)
+      socket.emit('error event', '更新任务出错')
     })
   })
 

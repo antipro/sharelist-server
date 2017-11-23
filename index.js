@@ -133,12 +133,26 @@ io.on('connection', (socket) => {
     socket.emit('init', {
       tasks,
       projects
-    }) 
+    })
   }).catch((err) => {
     console.error(err)
     socket.emit('error event', '查询项目出错')
   })
 
+  socket.on('refresh', (fn) => {
+    pool.promise(sql1 + ';' + sql2).then((results, fields) => {
+      let tasks = results[0]
+      let projects = results[1]
+      socket.emit('init', {
+        tasks,
+        projects
+      })
+      fn()
+    }).catch((err) => {
+      console.error(err)
+      socket.emit('error event', '查询项目出错')
+    })
+  })
 
   /**
    * 新增任务
@@ -187,6 +201,10 @@ io.on('connection', (socket) => {
    */
   socket.on('updateproject', ({ pid, pname, shares }) => {
     pool.promise('UPDATE projects SET name = ? WHERE id = ?', [ pname, pid ]).then(results => {
+      socket.emit('project updated', {
+        id: pid,
+        name: pname
+      })
       return pool.promise('SELECT uid FROM shares WHERE pid = ?', [ pid ])
     }).then(results => {
       console.debug('unshared project event')

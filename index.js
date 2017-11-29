@@ -120,10 +120,10 @@ io.on('connection', (socket) => {
       SELECT b.id, b.uid, b.content, b.pid, b.state, DATE_FORMAT(b.ctime, \'%Y-%m-%d %H:%i:%s\') AS ctime, DATE_FORMAT(b.notify_date, \'%Y-%m-%d\') AS notify_date 
       FROM shares a, tasks b WHERE a.uid = ${uid} AND a.pid = b.pid AND b.state <> 2`
   let sql2 = `SELECT id AS id, uid, name, DATE_FORMAT(ctime, \'%Y-%m-%d %H:%i:%s\') AS ctime, editable, \'\' AS control 
-      FROM projects WHERE uid = ${uid}
+      FROM projects WHERE uid = ${uid} AND state = 0
       UNION 
       SELECT b.id, b.uid, b.name, DATE_FORMAT(b.ctime, \'%Y-%m-%d %H:%i:%s\') AS ctime, \'\' AS editable, a.control 
-      FROM shares a, projects b WHERE a.uid = ${uid} AND a.pid = b.id`
+      FROM shares a, projects b WHERE a.uid = ${uid} AND a.pid = b.id AND b.state = 0`
   pool.promise(sql1 + ';' + sql2).then((results, fields) => {
     let tasks = results[0]
     let projects = results[1]
@@ -168,6 +168,20 @@ io.on('connection', (socket) => {
     }).catch((err) => {
       console.error(err)
       socket.emit('error event', '新增任务出错')
+    })
+  })
+
+  /**
+   * 删除任务
+   */
+  socket.on('removeproject', ({ pid }) => {
+    pool.promise('UPDATE projects SET state = 1 WHERE id = ?', [ pid ]).then(() => {
+      return pool.promise('UPDATE tasks SET state = 2 WHERE pid = ?', [ pid ])
+    }).then(() => {
+      socket.emit('project removed', pid).to('project ' + pid).emit('project removed', pid)
+    }).catch((err) => {
+      console.error(err)
+      socket.emit('error event', '移除任务出错')
     })
   })
 

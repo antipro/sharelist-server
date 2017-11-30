@@ -9,3 +9,4 @@ npm-debug.log*
 *.ntvs*
 *.njsproj
 *.sln
+nohup.out

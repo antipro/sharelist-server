@@ -155,6 +155,23 @@ io.on('connection', (socket) => {
   })
 
   /**
+   * 新增项目
+   */
+  socket.on('addproject', ({ uid, name }) => {
+    pool.promise('INSERT INTO projects SET ?', { uid, name }).then((results, fields) => {
+      let id = results.insertId
+      socket.join('project ' + id)
+      return pool.promise(`SELECT id AS id, uid, name, DATE_FORMAT(ctime, \'%Y-%m-%d %H:%i:%s\') AS ctime, editable, \'\' AS control 
+          FROM projects WHERE id = ?`, id)
+    }).then((results, fields) => {
+      socket.emit('project added', results[0])
+    }).catch((err) => {
+      console.error(err)
+      socket.emit('error event', '新增任务出错')
+    })
+  })
+
+  /**
    * 新增任务
    */
   socket.on('addtask', ({ pid, uid, content }) => {

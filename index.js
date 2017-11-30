@@ -235,6 +235,9 @@ io.on('connection', (socket) => {
       socket.emit('project updated', {
         id: pid,
         name: pname
+      }).to('project ' + pid).emit('project updated', {
+        id: pid,
+        name: pname
       })
       return pool.promise('SELECT uid FROM shares WHERE pid = ?', [ pid ])
     }).then(results => {

@@ -1,3 +1,5 @@
+var setInterval = require('timers').setInterval
+var setTimeout = require('timers').setTimeout
 var app = require('express')()
 var http = require('http').Server(app)
 var io = require('socket.io')(http, { origins: '*:*' })
@@ -114,10 +116,12 @@ io.on('connection', (socket) => {
   sockets[uid].push(socket)
   console.log(sockets)
 
-  let sql1 = `SELECT a.id, a.uid, a.content, a.pid, a.state, DATE_FORMAT(a.ctime, \'%Y-%m-%d %H:%i:%s\') AS ctime, DATE_FORMAT(a.notify_date, \'%Y-%m-%d\') AS notify_date 
+  let sql1 = `SELECT a.id, a.uid, a.content, a.pid, a.state, DATE_FORMAT(a.ctime, \'%Y-%m-%d %H:%i:%s\') AS ctime, 
+      DATE_FORMAT(a.notify_date, \'%Y-%m-%d\') AS notify_date, DATE_FORMAT(a.notify_time, \'%H:%i\') AS notify_time 
       FROM tasks a, projects b WHERE a.pid = b.id AND b.uid = ${uid} AND a.state <> 2
       UNION
-      SELECT b.id, b.uid, b.content, b.pid, b.state, DATE_FORMAT(b.ctime, \'%Y-%m-%d %H:%i:%s\') AS ctime, DATE_FORMAT(b.notify_date, \'%Y-%m-%d\') AS notify_date 
+      SELECT b.id, b.uid, b.content, b.pid, b.state, DATE_FORMAT(b.ctime, \'%Y-%m-%d %H:%i:%s\') AS ctime, 
+      DATE_FORMAT(b.notify_date, \'%Y-%m-%d\') AS notify_date, DATE_FORMAT(b.notify_time, \'%H:%i\') AS notify_time 
       FROM shares a, tasks b WHERE a.uid = ${uid} AND a.pid = b.pid AND b.state <> 2`
   let sql2 = `SELECT id AS id, uid, name, DATE_FORMAT(ctime, \'%Y-%m-%d %H:%i:%s\') AS ctime, editable, \'\' AS control 
       FROM projects WHERE uid = ${uid} AND state = 0
@@ -141,6 +145,38 @@ io.on('connection', (socket) => {
     console.error(err)
     socket.emit('error event', '查询项目出错')
   })
+
+  let notifications = new Object()
+  let push = () => {
+    let current_time = Date.now()
+    let sql = `SELECT a.id, a.content, DATE_FORMAT(a.notify_date, \'%Y-%m-%d\') AS notify_date, DATE_FORMAT(IFNULL(a.notify_time, c.notify_time), \'%H:%i\') AS notify_time 
+        FROM tasks a, projects b, users c WHERE a.pid = b.id AND b.uid = ${uid} AND b.uid = c.id AND a.state = 0 AND a.notify_date = CURRENT_DATE
+        UNION
+        SELECT a.id, a.content, DATE_FORMAT(a.notify_date, \'%Y-%m-%d\') AS notify_date, DATE_FORMAT(IFNULL(a.notify_time, c.notify_time), \'%H:%i\') AS notify_time 
+        FROM tasks a, shares b, users c WHERE b.uid = ${uid} AND b.uid = c.id AND a.pid = b.pid AND a.state = 0 AND a.notify_date = CURRENT_DATE`
+    pool.promise(sql).then(results => {
+      results.forEach(task => {
+        let future_time = Date.parse(task.notify_date + ' ' + task.notify_time + ':00')
+        if (future_time > current_time && future_time < current_time + 1800 * 1000) {
+          if (notifications[task.id]) {
+            clearTimeout(notifications[task.id])
+            delete notifications[task.id]
+          }
+          notifications[task.id] = setTimeout(() => {
+            console.log('push', task)
+            socket.emit('task notified', task)
+            delete notifications[task.id]
+          }, future_time - current_time)
+        }
+      })
+    }).catch((err) => {
+      console.error(err)
+      socket.emit('error event', '推送消息出错')
+    })
+  }
+  push()
+  // 每30分钟查询需要推送的列表，提前1分钟发送。
+  setInterval(push, 1800 * 1000)
 
   socket.on('refresh', (fn) => {
     pool.promise(sql1 + ';' + sql2).then((results, fields) => {
@@ -339,7 +375,7 @@ io.on('connection', (socket) => {
       }
     }).catch(err => {
       console.error(err)
-      socket.emit('error event', '更新任务出错')
+      socket.emit('error event', '更新属性出错')
     })
   })
 
@@ -349,6 +385,11 @@ io.on('connection', (socket) => {
   socket.on('disconnect', () => {
     console.log('user %d disconnected', uid)
     sockets[uid] = sockets[uid].filter(s => s.id !== socket.id)
+    for(let id in notifications) {
+      clearTimeout(notifications[id])
+      delete notifications[id]
+    }
+
     if (sockets[uid].length === 0)
       delete sockets[uid]
     console.log(sockets)

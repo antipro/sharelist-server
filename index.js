@@ -124,15 +124,18 @@ io.on('connection', (socket) => {
       UNION 
       SELECT b.id, b.uid, b.name, DATE_FORMAT(b.ctime, \'%Y-%m-%d %H:%i:%s\') AS ctime, \'\' AS editable, a.control 
       FROM shares a, projects b WHERE a.uid = ${uid} AND a.pid = b.id AND b.state = 0`
-  pool.promise(sql1 + ';' + sql2).then((results, fields) => {
+  let sql3 = `SELECT DATE_FORMAT(notify_time, \'%H:%i\') AS notify_time FROM users WHERE id = ${uid}`
+  pool.promise(sql1 + ';' + sql2 + ';' + sql3).then((results, fields) => {
     let tasks = results[0]
     let projects = results[1]
+    let preference = results[2][0]
     projects.forEach(project => {
       socket.join('project ' + project.id)
     });
     socket.emit('init', {
       tasks,
-      projects
+      projects,
+      preference
     })
   }).catch((err) => {
     console.error(err)
@@ -321,6 +324,19 @@ io.on('connection', (socket) => {
         content,
         notify_date
       })
+    }).catch(err => {
+      console.error(err)
+      socket.emit('error event', '更新任务出错')
+    })
+  })
+
+  socket.on('updatepreference', preference => {
+    pool.promise('UPDATE users SET ? WHERE id = ' + uid, preference).then(results => {
+      if (sockets[uid]) {
+        sockets[uid].forEach(s => {
+          s.emit('preference updated', preference)
+        })
+      }
     }).catch(err => {
       console.error(err)
       socket.emit('error event', '更新任务出错')

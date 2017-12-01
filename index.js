@@ -1,3 +1,5 @@
+process.env.TZ = 'Asia/Shanghai'
+console.log(new Date())
 var setInterval = require('timers').setInterval
 var setTimeout = require('timers').setTimeout
 var app = require('express')()

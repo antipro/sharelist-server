@@ -149,36 +149,37 @@ io.on('connection', (socket) => {
   })
 
   let notifications = new Object()
-  let push = () => {
+  let pushNotification = (task) => {
     let current_time = Date.now()
+    let future_time = Date.parse(task.notify_date + ' ' + task.notify_time + ':00')
+    if (future_time > current_time && future_time < current_time + 1800 * 1000) {
+      if (notifications[task.id]) {
+        clearTimeout(notifications[task.id])
+        delete notifications[task.id]
+      }
+      notifications[task.id] = setTimeout(() => {
+        console.log('push', task)
+        socket.emit('task notified', task)
+        delete notifications[task.id]
+      }, future_time - current_time)
+    }
+  }
+  let schedule = () => {
     let sql = `SELECT a.id, a.content, DATE_FORMAT(a.notify_date, \'%Y-%m-%d\') AS notify_date, DATE_FORMAT(IFNULL(a.notify_time, c.notify_time), \'%H:%i\') AS notify_time 
         FROM tasks a, projects b, users c WHERE a.pid = b.id AND b.uid = ${uid} AND b.uid = c.id AND a.state = 0 AND a.notify_date = CURRENT_DATE
         UNION
         SELECT a.id, a.content, DATE_FORMAT(a.notify_date, \'%Y-%m-%d\') AS notify_date, DATE_FORMAT(IFNULL(a.notify_time, c.notify_time), \'%H:%i\') AS notify_time 
         FROM tasks a, shares b, users c WHERE b.uid = ${uid} AND b.uid = c.id AND a.pid = b.pid AND a.state = 0 AND a.notify_date = CURRENT_DATE`
     pool.promise(sql).then(results => {
-      results.forEach(task => {
-        let future_time = Date.parse(task.notify_date + ' ' + task.notify_time + ':00')
-        if (future_time > current_time && future_time < current_time + 1800 * 1000) {
-          if (notifications[task.id]) {
-            clearTimeout(notifications[task.id])
-            delete notifications[task.id]
-          }
-          notifications[task.id] = setTimeout(() => {
-            console.log('push', task)
-            socket.emit('task notified', task)
-            delete notifications[task.id]
-          }, future_time - current_time)
-        }
-      })
+      results.forEach(pushNotification)
     }).catch((err) => {
       console.error(err)
       socket.emit('error event', '推送消息出错')
     })
   }
-  push()
+  schedule()
   // 每30分钟查询需要推送的列表，提前1分钟发送。
-  setInterval(push, 1800 * 1000)
+  setInterval(schedule, 1800 * 1000)
 
   socket.on('refresh', (fn) => {
     pool.promise(sql1 + ';' + sql2).then((results, fields) => {
@@ -219,10 +220,14 @@ io.on('connection', (socket) => {
     pool.promise('INSERT INTO tasks SET ?', { uid, pid, content }).then((results, fields) => {
       let id = results.insertId
       return pool.promise(`SELECT id, uid, content, pid, state, DATE_FORMAT(ctime, \'%Y-%m-%d %H:%i:%s\') AS ctime, 
-                            DATE_FORMAT(notify_date, \'%Y-%m-%d\') AS notify_date 
+                            DATE_FORMAT(notify_date, \'%Y-%m-%d\') AS notify_date, DATE_FORMAT(notify_time, \'%H:%i\') AS notify_time 
                             FROM tasks WHERE id = ?`, id)
     }).then((results, fields) => {
-      socket.emit('task added', results[0]).to('project ' + pid).emit('task added', results[0])
+      let task = results[0]
+      socket.emit('task added', task).to('project ' + pid).emit('task added', task)
+      if (task.state === 0) {
+        pushNotification(task)
+      }
     }).catch((err) => {
       console.error(err)
       socket.emit('error event', '新增任务出错')
@@ -260,7 +265,15 @@ io.on('connection', (socket) => {
    */
   socket.on('toggletask', ({ id, state, pid }) => {
     pool.promise('UPDATE tasks SET state = ? WHERE id = ?', [ state, id ]).then((results, fields) => {
-      socket.emit('task toggled', id, state).to('project ' + pid).emit('task toggled', id, state)
+      return pool.promise(`SELECT id, uid, content, pid, state, DATE_FORMAT(ctime, \'%Y-%m-%d %H:%i:%s\') AS ctime, 
+          DATE_FORMAT(notify_date, \'%Y-%m-%d\') AS notify_date, DATE_FORMAT(notify_time, \'%H:%i\') AS notify_time 
+          FROM tasks WHERE id = ?`, id)
+    }).then(results => {
+      let task = results[0]
+      socket.emit('task toggled', task).to('project ' + pid).emit('task toggled', task)
+      if (task.state === 0) {
+        pushNotification(task)
+      }
     }).catch((err) => {
       console.error(err)
       socket.emit('error event', '标记任务出错')
@@ -348,20 +361,20 @@ io.on('connection', (socket) => {
   /**
    * 更新任务
    */
-  socket.on('updatetask', ({ id, pid, content, notify_date }) => {
+  socket.on('updatetask', ({ id, pid, content, notify_date, notify_time }) => {
     if (notify_date === '') {
       notify_date = null
     }
-    pool.promise('UPDATE tasks SET content = ?, notify_date = ? WHERE id = ?', [content, notify_date, id]).then(results => {
-      socket.emit('task updated', {
-        id,
-        content,
-        notify_date
-      }).to('project ' + pid).emit('task updated', {
-        id,
-        content,
-        notify_date
-      })
+    pool.promise('UPDATE tasks SET content = ?, notify_date = ?, notify_time = ? WHERE id = ?', [content, notify_date, notify_time, id]).then(results => {
+      return pool.promise(`SELECT id, uid, content, pid, state, DATE_FORMAT(ctime, \'%Y-%m-%d %H:%i:%s\') AS ctime, 
+          DATE_FORMAT(notify_date, \'%Y-%m-%d\') AS notify_date, DATE_FORMAT(notify_time, \'%H:%i\') AS notify_time 
+          FROM tasks WHERE id = ?`, id)
+    }).then(results => {
+      let task = results[0]
+      socket.emit('task updated', task).to('project ' + pid).emit('task updated', task)
+      if (task.state === 0) {
+        pushNotification(task)
+      }
     }).catch(err => {
       console.error(err)
       socket.emit('error event', '更新任务出错')

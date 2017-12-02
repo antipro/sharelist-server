@@ -137,7 +137,7 @@ io.on('connection', (socket) => {
     let preference = results[2][0]
     projects.forEach(project => {
       socket.join('project ' + project.id)
-    });
+    })
     socket.emit('init', {
       tasks,
       projects,
@@ -166,10 +166,10 @@ io.on('connection', (socket) => {
   }
   let schedule = () => {
     let sql = `SELECT a.id, a.content, DATE_FORMAT(a.notify_date, \'%Y-%m-%d\') AS notify_date, DATE_FORMAT(IFNULL(a.notify_time, c.notify_time), \'%H:%i\') AS notify_time 
-        FROM tasks a, projects b, users c WHERE a.pid = b.id AND b.uid = ${uid} AND b.uid = c.id AND a.state = 0 AND a.notify_date = CURRENT_DATE
+        FROM tasks a, projects b, users c WHERE a.pid = b.id AND b.uid = ${uid} AND b.uid = c.id AND a.state = 0 AND a.notify_date IS NOT NULL
         UNION
         SELECT a.id, a.content, DATE_FORMAT(a.notify_date, \'%Y-%m-%d\') AS notify_date, DATE_FORMAT(IFNULL(a.notify_time, c.notify_time), \'%H:%i\') AS notify_time 
-        FROM tasks a, shares b, users c WHERE b.uid = ${uid} AND b.uid = c.id AND a.pid = b.pid AND a.state = 0 AND a.notify_date = CURRENT_DATE`
+        FROM tasks a, shares b, users c WHERE b.uid = ${uid} AND b.uid = c.id AND a.pid = b.pid AND a.state = 0 AND a.notify_date IS NOT NULL`
     pool.promise(sql).then(results => {
       results.forEach(pushNotification)
     }).catch((err) => {
@@ -189,6 +189,7 @@ io.on('connection', (socket) => {
         tasks,
         projects
       })
+      tasks.forEach(pushNotification)
       fn()
     }).catch((err) => {
       console.error(err)
@@ -242,6 +243,14 @@ io.on('connection', (socket) => {
       return pool.promise('UPDATE tasks SET state = 2 WHERE pid = ?', [ pid ])
     }).then(() => {
       socket.emit('project removed', pid).to('project ' + pid).emit('project removed', pid)
+      return pool.promise('SELECT id FROM tasks WHERE pid = ?', [pid])
+    }).then(results => {
+      results.forEach(id => {
+        if (notifications[id]) {
+          clearTimeout(notifications[id])
+          delete notifications[id]
+        }
+      })
     }).catch((err) => {
       console.error(err)
       socket.emit('error event', '移除任务出错')
@@ -254,6 +263,10 @@ io.on('connection', (socket) => {
   socket.on('removetask', ({ id, pid }) => {
     pool.promise('UPDATE tasks SET state = 2 WHERE ?', { id }).then((results, fields) => {
       socket.emit('task removed', id).to('project ' + pid).emit('task removed', id)
+      if (notifications[id]) {
+        clearTimeout(notifications[id])
+        delete notifications[id]
+      }
     }).catch((err) => {
       console.error(err)
       socket.emit('error event', '移除任务出错')
@@ -273,6 +286,10 @@ io.on('connection', (socket) => {
       socket.emit('task toggled', task).to('project ' + pid).emit('task toggled', task)
       if (task.state === 0) {
         pushNotification(task)
+      }
+      if (task.state === 1 && notifications[id]) {
+        clearTimeout(notifications[id])
+        delete notifications[id]
       }
     }).catch((err) => {
       console.error(err)
@@ -364,6 +381,9 @@ io.on('connection', (socket) => {
   socket.on('updatetask', ({ id, pid, content, notify_date, notify_time }) => {
     if (notify_date === '') {
       notify_date = null
+    }
+    if (notify_time === '') {
+      notify_time = null
     }
     pool.promise('UPDATE tasks SET content = ?, notify_date = ?, notify_time = ? WHERE id = ?', [content, notify_date, notify_time, id]).then(results => {
       return pool.promise(`SELECT id, uid, content, pid, state, DATE_FORMAT(ctime, \'%Y-%m-%d %H:%i:%s\') AS ctime, 

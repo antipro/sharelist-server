@@ -10,3 +10,5 @@ npm-debug.log*
 *.njsproj
 *.sln
 nohup.out
+
+logs/

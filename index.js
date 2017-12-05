@@ -1,7 +1,19 @@
 process.env.TZ = 'Asia/Shanghai'
-console.log(new Date())
+console.log('server startup at %s', new Date())
 var setInterval = require('timers').setInterval
 var setTimeout = require('timers').setTimeout
+const log4js = require('log4js');
+log4js.configure({
+  appenders: {
+    out: { type: 'stdout' },
+    app: { type: 'file', filename: 'logs/application.log', maxLogSize: 10485760 }
+  },
+  categories: {
+    default: { appenders: [ 'out', 'app' ], level: 'debug' }
+  }
+})
+const logger = log4js.getLogger()
+
 var app = require('express')()
 var http = require('http').Server(app)
 var io = require('socket.io')(http, { origins: '*:*' })
@@ -35,7 +47,7 @@ app.all("*", function (req, res, next) {
 });
 app.get('/api/login', (req, res) => {
   pool.promise('SELECT id AS uid, tel, token, name AS uname FROM users WHERE tel = ? AND pwd = SHA1(?)', [req.query.tel, req.query.pwd]).then((results, fields) => {
-    console.log(results)
+    logger.debug(results)
     if (results.length === 0) {
       res.send({
         state: '001',
@@ -49,7 +61,7 @@ app.get('/api/login', (req, res) => {
       data: results[0]
     })
   }).catch((err) => {
-    console.log(err)
+    logger.debug(err)
     res.send({
       state: '001',
       msg: `登录出错：${err}`
@@ -59,7 +71,7 @@ app.get('/api/login', (req, res) => {
 
 app.get('/api/shares/:pid', (req, res) => {
   pool.promise('SELECT b.id AS uid, b.tel, name AS uname FROM shares a, users b WHERE a.pid = ? AND a.uid = b.id', [ req.params.pid ]).then((results, fields) => {
-    console.log(results)
+    logger.debug(results)
     res.send({
       state: '000',
       msg: '',
@@ -110,7 +122,7 @@ let timers = new Object()
  * @param id 
  */
 function updateTimers (id) {
-  console.log('update timer of task #%d', id)
+  logger.debug('update timer of task #%d', id)
   if (timers[id]) {
     timers[id].forEach(timer => {
       clearTimeout(timer)
@@ -131,7 +143,7 @@ function updateTimers (id) {
       }
       let timer = setTimeout(() => {
         if (sockets[task.uid]) {
-          console.log('push task #%d to user #%d', task.id, task.uid)
+          logger.debug('push task #%d to user #%d', task.id, task.uid)
           sockets[task.uid].forEach(s => {
             s.emit('task notified', task)
           })
@@ -139,7 +151,7 @@ function updateTimers (id) {
       }, future_time - current_time)
       timers[id].push(timer)
     })
-    console.log(timers)
+    logger.debug(timers)
   }).catch((err) => {
     console.error(err)
     socket.emit('error event', '查询推送出错')
@@ -160,17 +172,17 @@ pool.promise(sql).then(results => {
  */
 io.on('connection', (socket) => {
   if (socket.handshake.query.token === '') {
-    console.log('invalid user disconnect')
+    logger.debug('invalid user disconnect')
     socket.disconnect()
     return
   }
   let uid = socket.handshake.query.uid
-  console.log('user %d connected', uid)
+  logger.debug('user %d connected', uid)
   if (!sockets[uid]) {
     sockets[uid] = new Array()
   }
   sockets[uid].push(socket)
-  console.log(sockets)
+  logger.debug(sockets)
 
   let sql1 = `SELECT a.id, a.uid, a.content, a.pid, a.state, DATE_FORMAT(a.ctime, \'%Y-%m-%d %H:%i:%s\') AS ctime, 
       DATE_FORMAT(a.notify_date, \'%Y-%m-%d\') AS notify_date, DATE_FORMAT(a.notify_time, \'%H:%i\') AS notify_time 
@@ -332,7 +344,7 @@ io.on('connection', (socket) => {
       return Promise.all(old_uids.map(uid => {
         // 收回共享
         if (new_uids.indexOf(uid) === -1) {
-          console.log('unshared with %d', uid)
+          logger.debug('unshared with %d', uid)
           return pool.promise('DELETE FROM shares WHERE pid = ? AND uid = ?', [ pid, uid ]).then((results) => {
             if (sockets[uid]) {
               sockets[uid].forEach(s => {
@@ -445,7 +457,7 @@ io.on('connection', (socket) => {
    * 断开链接
    */
   socket.on('disconnect', () => {
-    console.log('user %d disconnected', uid)
+    logger.debug('user %d disconnected', uid)
     sockets[uid] = sockets[uid].filter(s => s.id !== socket.id)
     for(let id in timers) {
       clearTimeout(timers[id])
@@ -454,10 +466,10 @@ io.on('connection', (socket) => {
 
     if (sockets[uid].length === 0)
       delete sockets[uid]
-    console.log(sockets)
+    logger.debug(sockets)
   })
 })
 
 http.listen(3000, () => {
-  console.log('listening on *:3000')
+  logger.debug('listening on *:3000')
 })

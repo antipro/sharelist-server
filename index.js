@@ -130,8 +130,8 @@ function updateTimers (id) {
         return
       }
       let timer = setTimeout(() => {
-        console.log('push task #%d to user #%d', task.id, task.uid)
         if (sockets[task.uid]) {
+          console.log('push task #%d to user #%d', task.id, task.uid)
           sockets[task.uid].forEach(s => {
             s.emit('task notified', task)
           })
@@ -139,11 +139,11 @@ function updateTimers (id) {
       }, future_time - current_time)
       timers[id].push(timer)
     })
+    console.log(timers)
   }).catch((err) => {
     console.error(err)
     socket.emit('error event', '查询推送出错')
   })
-  console.log(timers)
 }
 let sql = `SELECT id FROM tasks WHERE state = 0 AND notify_date >= CURRENT_DATE`
 pool.promise(sql).then(results => {

@@ -1,7 +1,10 @@
+// Set TimeZone
 process.env.TZ = 'Asia/Shanghai'
 console.log('server startup at %s', new Date())
 var setInterval = require('timers').setInterval
 var setTimeout = require('timers').setTimeout
+
+// init log4js
 const log4js = require('log4js');
 log4js.configure({
   appenders: {
@@ -19,6 +22,7 @@ var http = require('http').Server(app)
 var io = require('socket.io')(http, { origins: '*:*' })
 const util = require('util')
 
+// init connnection pool of database
 const pool = require('mysql').createPool({
   host     : 'localhost',
   user     : 'antipro',
@@ -27,6 +31,7 @@ const pool = require('mysql').createPool({
   multipleStatements: true
 })
 
+// promise
 pool.promise = util.promisify(pool.query)
 
 app.all("*", function (req, res, next) {
@@ -45,6 +50,10 @@ app.all("*", function (req, res, next) {
   }
   next();
 });
+
+/**
+ * Login
+ */
 app.get('/api/login', (req, res) => {
   pool.promise('SELECT id AS uid, tel, token, name AS uname FROM users WHERE tel = ? AND pwd = SHA1(?)', [req.query.tel, req.query.pwd]).then((results, fields) => {
     logger.debug(results)
@@ -69,6 +78,9 @@ app.get('/api/login', (req, res) => {
   })
 })
 
+/**
+ * Shared users of project
+ */
 app.get('/api/shares/:pid', (req, res) => {
   pool.promise('SELECT b.id AS uid, b.tel, name AS uname FROM shares a, users b WHERE a.pid = ? AND a.uid = b.id', [ req.params.pid ]).then((results, fields) => {
     logger.debug(results)
@@ -86,11 +98,14 @@ app.get('/api/shares/:pid', (req, res) => {
   })
 })
 
+/**
+ * Project info and tasks
+ */
 app.get('/api/projects/:pid', (req, res) => {
   let sql1 = `SELECT id, uid, content, pid, state, DATE_FORMAT(ctime, \'%Y-%m-%d %H:%i:%s\') AS ctime, DATE_FORMAT(notify_date, \'%Y-%m-%d\') AS notify_date 
     FROM tasks WHERE pid = ${req.params.pid} AND state <> 2`
-  let sql2 = `SELECT id AS id, uid, name, DATE_FORMAT(ctime, \'%Y-%m-%d %H:%i:%s\') AS ctime, editable, \'\' AS control 
-    FROM projects WHERE id = ${req.params.pid}`
+  let sql2 = `SELECT a.id, a.uid, u.name AS uname, a.name, DATE_FORMAT(a.ctime, \'%Y-%m-%d %H:%i:%s\') AS ctime, a.editable, \'\' AS control 
+    FROM projects a, users u WHERE a.id = ${req.params.pid} AND a.uid = u.id`
   pool.promise(sql1 + ';' + sql2).then(results => {
     let tasks = results[0]
     let project = results[1][0]
@@ -111,15 +126,20 @@ app.get('/api/projects/:pid', (req, res) => {
   })
 })
 
+/**
+ * Socket object collection
+ * user.id:array[socket]
+ */
 const sockets = new Object()
 
 /**
- * Timeout对象集合，每个task的id对应一组timeout
+ * Timer object collection
+ * task.id:array[timeout]
  */
 let timers = new Object()
 /**
- * 更新id对应的所有timeout
- * @param id 
+ * update all timers of some task
+ * @param id task.id
  */
 function updateTimers (id) {
   logger.debug('update timer of task #%d', id)
@@ -157,6 +177,8 @@ function updateTimers (id) {
     socket.emit('error event', '查询推送出错')
   })
 }
+
+// init all timers
 let sql = `SELECT id FROM tasks WHERE state = 0 AND notify_date >= CURRENT_DATE`
 pool.promise(sql).then(results => {
   results.forEach(task => {
@@ -168,7 +190,7 @@ pool.promise(sql).then(results => {
 })
 
 /**
- * 成功链接
+ * socket connection event
  */
 io.on('connection', (socket) => {
   if (socket.handshake.query.token === '') {
@@ -191,11 +213,11 @@ io.on('connection', (socket) => {
       SELECT b.id, b.uid, b.content, b.pid, b.state, DATE_FORMAT(b.ctime, \'%Y-%m-%d %H:%i:%s\') AS ctime, 
       DATE_FORMAT(b.notify_date, \'%Y-%m-%d\') AS notify_date, DATE_FORMAT(b.notify_time, \'%H:%i\') AS notify_time 
       FROM shares a, tasks b WHERE a.uid = ${uid} AND a.pid = b.pid AND b.state <> 2`
-  let sql2 = `SELECT id AS id, uid, name, DATE_FORMAT(ctime, \'%Y-%m-%d %H:%i:%s\') AS ctime, editable, \'\' AS control 
-      FROM projects WHERE uid = ${uid} AND state = 0
+  let sql2 = `SELECT a.id, a.uid, u.name AS uname, a.name, DATE_FORMAT(a.ctime, \'%Y-%m-%d %H:%i:%s\') AS ctime, a.editable, \'\' AS control 
+      FROM projects a, users u WHERE a.uid = ${uid} AND a.state = 0 AND a.uid = u.id
       UNION 
-      SELECT b.id, b.uid, b.name, DATE_FORMAT(b.ctime, \'%Y-%m-%d %H:%i:%s\') AS ctime, \'\' AS editable, a.control 
-      FROM shares a, projects b WHERE a.uid = ${uid} AND a.pid = b.id AND b.state = 0`
+      SELECT a.id, a.uid, u.name AS uname, a.name, DATE_FORMAT(a.ctime, \'%Y-%m-%d %H:%i:%s\') AS ctime, \'\' AS editable, b.control 
+      FROM projects a, shares b, users u WHERE b.uid = ${uid} AND a.id = b.pid AND a.state = 0 AND a.uid = u.id`
   let sql3 = `SELECT DATE_FORMAT(notify_time, \'%H:%i\') AS notify_time FROM users WHERE id = ${uid}`
   let callback = (results) => {
     let tasks = results[0]
@@ -215,6 +237,9 @@ io.on('connection', (socket) => {
     socket.emit('error event', '查询项目出错')
   })
 
+  /**
+   * all data event
+   */
   socket.on('refresh', (fn) => {
     pool.promise(sql1 + ';' + sql2 + ';' + sql3).then((results) => {
       callback(results)
@@ -226,7 +251,7 @@ io.on('connection', (socket) => {
   })
 
   /**
-   * 新增项目
+   * add project event
    */
   socket.on('addproject', ({ uid, name }) => {
     pool.promise('INSERT INTO projects SET ?', { uid, name }).then((results, fields) => {
@@ -243,7 +268,7 @@ io.on('connection', (socket) => {
   })
 
   /**
-   * 新增任务
+   * add task event
    */
   socket.on('addtask', ({ pid, uid, content }) => {
     pool.promise('INSERT INTO tasks SET ?', { uid, pid, content }).then((results, fields) => {
@@ -262,7 +287,7 @@ io.on('connection', (socket) => {
   })
 
   /**
-   * 删除项目
+   * remove project event
    */
   socket.on('removeproject', ({ pid }) => {
     pool.promise('UPDATE projects SET state = 1 WHERE id = ?', [ pid ]).then(() => {
@@ -293,7 +318,7 @@ io.on('connection', (socket) => {
   })
 
   /**
-   * 删除任务
+   * remove task event
    */
   socket.on('removetask', ({ id, pid }) => {
     pool.promise('UPDATE tasks SET state = 2 WHERE ?', { id }).then((results, fields) => {
@@ -306,7 +331,7 @@ io.on('connection', (socket) => {
   })
 
   /**
-   * 完成任务
+   * toggle task event
    */
   socket.on('toggletask', ({ id, state, pid }) => {
     pool.promise('UPDATE tasks SET state = ? WHERE id = ?', [ state, id ]).then((results) => {
@@ -325,7 +350,7 @@ io.on('connection', (socket) => {
   })
 
   /**
-   * 更新项目
+   * update project event
    */
   socket.on('updateproject', ({ pid, pname, shares }) => {
     pool.promise('UPDATE projects SET name = ? WHERE id = ?', [ pname, pid ]).then((results) => {
@@ -407,7 +432,7 @@ io.on('connection', (socket) => {
   })
 
   /**
-   * 更新任务
+   * update task event
    */
   socket.on('updatetask', ({ id, pid, content, notify_date, notify_time }) => {
     if (notify_date === '') {
@@ -430,6 +455,9 @@ io.on('connection', (socket) => {
     })
   })
 
+  /**
+   * update preference event
+   */
   socket.on('updatepreference', preference => {
     pool.promise('UPDATE users SET ? WHERE id = ' + uid, preference).then(results => {
       if (sockets[uid]) {
@@ -454,7 +482,7 @@ io.on('connection', (socket) => {
   })
 
   /**
-   * 断开链接
+   * disconnection event
    */
   socket.on('disconnect', () => {
     logger.debug('user %d disconnected', uid)

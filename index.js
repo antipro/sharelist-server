@@ -43,7 +43,7 @@ app.all("*", function (req, res, next) {
     if (!token) {
       res.send({
         state: '001',
-        msg: '未登录'
+        msg: 'UnLogin'
       })
       return
     }
@@ -60,7 +60,7 @@ app.get('/api/login', (req, res) => {
     if (results.length === 0) {
       res.send({
         state: '001',
-        msg: '用户不存在'
+        msg: 'User Not Existed'
       })
       return
     }
@@ -73,7 +73,7 @@ app.get('/api/login', (req, res) => {
     logger.debug(err)
     res.send({
       state: '001',
-      msg: `登录出错：${err}`
+      msg: `Login Error：${err}`
     })
   })
 })
@@ -93,7 +93,7 @@ app.get('/api/shares/:pid', (req, res) => {
     console.error(err)
     res.send({
       state: '001',
-      msg: `查询分享人员出错：${err}`
+      msg: `Query error: ${err}`
     })
   })
 })
@@ -121,7 +121,7 @@ app.get('/api/projects/:pid', (req, res) => {
     console.error(err)
     res.send({
       state: '001',
-      msg: `查询项目信息出错：${err}`
+      msg: `Query error: ${err}`
     })
   })
 })
@@ -234,7 +234,7 @@ io.on('connection', (socket) => {
   }
   pool.promise(sql1 + ';' + sql2 + ';' + sql3).then(callback).catch((err) => {
     console.error(err)
-    socket.emit('error event', '查询项目出错')
+    socket.emit('error event', 'Query Error')
   })
 
   /**
@@ -246,7 +246,7 @@ io.on('connection', (socket) => {
       fn()
     }).catch((err) => {
       console.error(err)
-      socket.emit('error event', '查询项目出错')
+      socket.emit('error event', 'Query Error')
     })
   })
 
@@ -263,7 +263,7 @@ io.on('connection', (socket) => {
       socket.emit('project added', results[0])
     }).catch((err) => {
       console.error(err)
-      socket.emit('error event', '新增任务出错')
+      socket.emit('error event', 'Add Project Error')
     })
   })
 
@@ -282,7 +282,7 @@ io.on('connection', (socket) => {
       socket.emit('task added', task).to('project ' + pid).emit('task added', task)
     }).catch((err) => {
       console.error(err)
-      socket.emit('error event', '新增任务出错')
+      socket.emit('error event', 'Add Task Error')
     })
   })
 
@@ -313,7 +313,7 @@ io.on('connection', (socket) => {
       })
     }).catch((err) => {
       console.error(err)
-      socket.emit('error event', '删除项目出错')
+      socket.emit('error event', 'Remove Project Error')
     })
   })
 
@@ -326,7 +326,7 @@ io.on('connection', (socket) => {
       updateTimers(id)
     }).catch((err) => {
       console.error(err)
-      socket.emit('error event', '删除任务出错')
+      socket.emit('error event', 'Remove Task Error')
     })
   })
 
@@ -344,7 +344,7 @@ io.on('connection', (socket) => {
       updateTimers(id)
     }).catch((err) => {
       console.error(err)
-      socket.emit('error event', '标记任务出错')
+      socket.emit('error event', 'Toggle Task Error')
       return
     })
   })
@@ -367,7 +367,7 @@ io.on('connection', (socket) => {
       const old_uids = results.map(row => row.uid)
       const new_uids = shares.map(share => share.uid)
       return Promise.all(old_uids.map(uid => {
-        // 收回共享
+        // withdraw sharing
         if (new_uids.indexOf(uid) === -1) {
           logger.debug('unshared with %d', uid)
           return pool.promise('DELETE FROM shares WHERE pid = ? AND uid = ?', [ pid, uid ]).then((results) => {
@@ -388,7 +388,7 @@ io.on('connection', (socket) => {
         } else {
           return pool.promise('SELECT id FROM users WHERE tel = ?', [ share.tel ]).then(results => {
             if (results.length === 0) {
-              // 添加新用户
+              // add new user
               return pool.promise('INSERT INTO users SET ?', { tel: share.tel }).then(results => {
                 return Promise.resolve(results.insertId)
               })
@@ -427,7 +427,7 @@ io.on('connection', (socket) => {
       })
     }).catch((err) => {
       console.error(err)
-      socket.emit('error event', '更新项目出错')
+      socket.emit('error event', 'Update Project Error')
     })
   })
 
@@ -451,7 +451,7 @@ io.on('connection', (socket) => {
       updateTimers(id)
     }).catch(err => {
       console.error(err)
-      socket.emit('error event', '更新任务出错')
+      socket.emit('error event', 'Update Task Error')
     })
   })
 
@@ -477,7 +477,7 @@ io.on('connection', (socket) => {
       })
     }).catch(err => {
       console.error(err)
-      socket.emit('error event', '更新属性出错')
+      socket.emit('error event', 'Update Preference Error')
     })
   })
 

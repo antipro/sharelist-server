@@ -22,12 +22,25 @@ var http = require('http').Server(app)
 var io = require('socket.io')(http, { origins: '*:*' })
 const util = require('util')
 
+try {
+  var config = require('./config.js').config
+} catch (error) {
+  console.log('Please create config.js file.')
+  console.log('Content like this:')
+  console.log(`exports.config = {
+    host: 'host',
+    user: 'user',
+    password: 'password',
+    database: 'database'
+  }`)
+  return -1
+}
 // init connnection pool of database
 const pool = require('mysql').createPool({
-  host     : 'localhost',
-  user     : 'antipro',
-  password : '385471c54e',
-  database : 'sharelist',
+  host     : config.host,
+  user     : config.user,
+  password : config.password,
+  database : config.database,
   multipleStatements: true
 })
 

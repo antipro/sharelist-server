@@ -56,7 +56,7 @@ app.all("*", function (req, res, next) {
     if (!token) {
       res.send({
         state: '001',
-        msg: 'UnLogin'
+        msg: 'message.not_logged_in'
       })
       return
     }
@@ -73,7 +73,7 @@ app.get('/api/login', (req, res) => {
     if (results.length === 0) {
       res.send({
         state: '001',
-        msg: 'User Not Existed'
+        msg: 'message.user_not_existed'
       })
       return
     }
@@ -86,7 +86,7 @@ app.get('/api/login', (req, res) => {
     logger.debug(err)
     res.send({
       state: '001',
-      msg: `Login Error：${err}`
+      msg: 'message.login_error'
     })
   })
 })
@@ -106,7 +106,7 @@ app.get('/api/shares/:pid', (req, res) => {
     console.error(err)
     res.send({
       state: '001',
-      msg: `Query error: ${err}`
+      msg: 'message.query_error'
     })
   })
 })
@@ -134,7 +134,7 @@ app.get('/api/projects/:pid', (req, res) => {
     console.error(err)
     res.send({
       state: '001',
-      msg: `Query error: ${err}`
+      msg: 'message.query_error'
     })
   })
 })
@@ -187,7 +187,7 @@ function updateTimers (id) {
     logger.debug(timers)
   }).catch((err) => {
     console.error(err)
-    socket.emit('error event', '查询推送出错')
+    socket.emit('error event', 'message.query_error')
   })
 }
 
@@ -199,7 +199,7 @@ pool.promise(sql).then(results => {
   })
 }).catch((err) => {
   console.error(err)
-  socket.emit('error event', '查询推送出错')
+  socket.emit('error event', 'message.query_error')
 })
 
 /**
@@ -247,7 +247,7 @@ io.on('connection', (socket) => {
   }
   pool.promise(sql1 + ';' + sql2 + ';' + sql3).then(callback).catch((err) => {
     console.error(err)
-    socket.emit('error event', 'Query Error')
+    socket.emit('error event', 'message.query_error')
   })
 
   /**
@@ -259,7 +259,7 @@ io.on('connection', (socket) => {
       fn()
     }).catch((err) => {
       console.error(err)
-      socket.emit('error event', 'Query Error')
+      socket.emit('error event', 'message.query_error')
     })
   })
 
@@ -276,7 +276,7 @@ io.on('connection', (socket) => {
       socket.emit('project added', results[0])
     }).catch((err) => {
       console.error(err)
-      socket.emit('error event', 'Add Project Error')
+      socket.emit('error event', 'message.add_error')
     })
   })
 
@@ -295,7 +295,7 @@ io.on('connection', (socket) => {
       socket.emit('task added', task).to('project ' + pid).emit('task added', task)
     }).catch((err) => {
       console.error(err)
-      socket.emit('error event', 'Add Task Error')
+      socket.emit('error event', 'message.add_error')
     })
   })
 
@@ -326,7 +326,7 @@ io.on('connection', (socket) => {
       })
     }).catch((err) => {
       console.error(err)
-      socket.emit('error event', 'Remove Project Error')
+      socket.emit('error event', 'message.remove_error')
     })
   })
 
@@ -339,7 +339,7 @@ io.on('connection', (socket) => {
       updateTimers(id)
     }).catch((err) => {
       console.error(err)
-      socket.emit('error event', 'Remove Task Error')
+      socket.emit('error event', 'message.remove_error')
     })
   })
 
@@ -357,7 +357,7 @@ io.on('connection', (socket) => {
       updateTimers(id)
     }).catch((err) => {
       console.error(err)
-      socket.emit('error event', 'Toggle Task Error')
+      socket.emit('error event', 'message.update_error')
       return
     })
   })
@@ -440,7 +440,7 @@ io.on('connection', (socket) => {
       })
     }).catch((err) => {
       console.error(err)
-      socket.emit('error event', 'Update Project Error')
+      socket.emit('error event', 'message.update_error')
     })
   })
 
@@ -464,7 +464,7 @@ io.on('connection', (socket) => {
       updateTimers(id)
     }).catch(err => {
       console.error(err)
-      socket.emit('error event', 'Update Task Error')
+      socket.emit('error event', 'message.update_error')
     })
   })
 
@@ -490,7 +490,7 @@ io.on('connection', (socket) => {
       })
     }).catch(err => {
       console.error(err)
-      socket.emit('error event', 'Update Preference Error')
+      socket.emit('error event', 'message.update_error')
     })
   })
 

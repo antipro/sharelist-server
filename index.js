@@ -68,7 +68,7 @@ app.all("*", function (req, res, next) {
  * Login
  */
 app.get('/api/login', (req, res) => {
-  pool.promise('SELECT id AS uid, tel, token, name AS uname FROM users WHERE tel = ? AND pwd = SHA1(?)', [req.query.tel, req.query.pwd]).then((results, fields) => {
+  pool.promise('SELECT id AS uid, email, token, name AS uname FROM users WHERE email = ? AND pwd = SHA1(?)', [req.query.email, req.query.pwd]).then((results, fields) => {
     logger.debug(results)
     if (results.length === 0) {
       res.send({
@@ -95,7 +95,7 @@ app.get('/api/login', (req, res) => {
  * Shared users of project
  */
 app.get('/api/shares/:pid', (req, res) => {
-  pool.promise('SELECT b.id AS uid, b.tel, name AS uname FROM shares a, users b WHERE a.pid = ? AND a.uid = b.id', [ req.params.pid ]).then((results, fields) => {
+  pool.promise('SELECT b.id AS uid, b.email, name AS uname FROM shares a, users b WHERE a.pid = ? AND a.uid = b.id', [ req.params.pid ]).then((results, fields) => {
     logger.debug(results)
     res.send({
       state: '000',
@@ -399,10 +399,10 @@ io.on('connection', (socket) => {
         if (share.uid !== 0) {
           return Promise.resolve(share.uid)
         } else {
-          return pool.promise('SELECT id FROM users WHERE tel = ?', [ share.tel ]).then(results => {
+          return pool.promise('SELECT id FROM users WHERE email = ?', [ share.email ]).then(results => {
             if (results.length === 0) {
               // add new user
-              return pool.promise('INSERT INTO users SET ?', { tel: share.tel }).then(results => {
+              return pool.promise('INSERT INTO users SET ?', { email: share.email }).then(results => {
                 return Promise.resolve(results.insertId)
               })
             } else {

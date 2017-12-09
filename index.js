@@ -31,7 +31,11 @@ try {
     host: 'host',
     user: 'user',
     password: 'password',
-    database: 'database'
+    database: 'database',
+    mailuser: 'mailuser',
+    mailpwd: 'mailpwd',
+    smtpserver: 'smtpserver',
+    smtpport: smtpport
   }`)
   return -1
 }
@@ -51,7 +55,8 @@ app.all("*", function (req, res, next) {
   res.header('Access-Control-Allow-Origin', '*');
   res.header("Access-Control-Allow-Headers", "Content-Type,Content-Length, Authorization, Accept,X-Requested-With, TOKEN");
   res.header("Access-Control-Allow-Methods","PUT,POST,GET,DELETE,OPTIONS");
-  if (req.path !== '/api/login') {
+  let excludeList = ['/api/login', '/api/verifycode', '/api/signup']
+  if (excludeList.indexOf(req.path) === -1) {
     let token = req.get('TOKEN')
     if (!token) {
       res.send({
@@ -87,6 +92,68 @@ app.get('/api/login', (req, res) => {
     res.send({
       state: '001',
       msg: 'message.login_error'
+    })
+  })
+})
+
+/**
+ * Verify Code
+ */
+app.get('/api/verifycode', (req, res) => {
+  const uuidv1 = require('uuid/v1');
+  const uuid = uuidv1();
+  const stringRandomJs = require("string_random.js").String_random
+  const code = stringRandomJs(/\w\d\w\d/);
+  pool.promise('SELECT 1 FROM users WHERE email = ? AND token IS NOT NULL', [ req.query.email ]).then((results, fields) => {
+    logger.debug(results)
+    if (results.length !== 0) {
+      res.send({
+        state: '001',
+        msg: 'message.user_already_existed'
+      })
+      return
+    }
+    return pool.promise('INSERT INTO verifycodes(email, uuid, code, expire) VALUES(?, ?, ?, DATE_ADD(NOW(), INTERVAL 30 MINUTE))', [ req.query.email, uuid, code ])
+  }).then(results => {
+    var email = require('emailjs');
+    var server = email.server.connect({
+      user: config.mailuser,
+      password: config.mailpwd,
+      host: config.smtpserver,
+      port: config.smtpport,
+      ssl: true
+    });
+    server.send({
+      text: `The Verification Code you received is ${code}, Please Do not Tell anybody else.`,
+      from: `Sharelist <${config.mailuser}>`,
+      to: req.query.email,
+      subject: "Verify Code",
+      attachment:
+      [
+        { data: `<html><p>The Verification Code you received is <b>${code}</b>, Please Do not Tell anybody else.</p></html>`, alternative: true }
+      ]
+    }, function (err, message) {
+      console.log(err, message)
+      if (err) {
+        res.send({
+          state: '001',
+          msg: 'message.mail_failure'
+        })
+        return
+      }
+      res.send({
+        state: '000',
+        msg: '',
+        data: {
+          uuid
+        }
+      })
+    });
+  }).catch((err) => {
+    logger.debug(err)
+    res.send({
+      state: '001',
+      msg: 'message.signup_error'
     })
   })
 })

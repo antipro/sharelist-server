@@ -123,14 +123,15 @@ app.get('/api/verifycode', (req, res) => {
       port: config.smtpport,
       ssl: true
     });
+    let mailcontent = req.query.mailcontent
     server.send({
-      text: `The Verification Code you received is ${code}, Please Do not Tell anybody else.`,
+      text: mailcontent.replace('{code}', code),
       from: `Sharelist <${config.mailuser}>`,
       to: req.query.email,
       subject: "Verify Code",
       attachment:
       [
-        { data: `<html><p>The Verification Code you received is <b>${code}</b>, Please Do not Tell anybody else.</p></html>`, alternative: true }
+        { data: `<html><p>${mailcontent.replace('{code}', '<b>' + code + '</b>')}</p></html>`, alternative: true }
       ]
     }, function (err, message) {
       console.log(err, message)
@@ -151,6 +152,57 @@ app.get('/api/verifycode', (req, res) => {
     });
   }).catch((err) => {
     logger.debug(err)
+    res.send({
+      state: '001',
+      msg: 'message.signup_error'
+    })
+  })
+})
+
+app.get('/api/signup', (req, res) => {
+  let email = req.query.email;
+  let username = req.query.username;
+  let pwd = req.query.pwd;
+  let uuid = req.query.uuid;
+  let verifycode = req.query.verifycode;
+  pool.promise('SELECT 1 FROM verifycodes WHERE email = ? AND uuid = ? AND code = ?', [ email, uuid, verifycode ]).then(results => {
+    if (results.length === 0) {
+      res.send({
+        state: '001',
+        msg: 'message.error_code_or_timeout'
+      })
+      return
+    }
+    return pool.promise('SELECT id, token FROM users WHERE email = ?', [ email ])
+  }).then(results => {
+    if (results.length === 0) {
+      return pool.promise('INSERT INTO users(email, name, pwd, token, ctime) VALUES(?, ?, SHA1(?), ?, NOW())', [email, username, pwd, uuid ]).then(results => {
+        return Promise.resolve(results.insertId)
+      })
+    } else {
+      if (results[0].token !== null) {
+        res.send({
+          state: '001',
+          msg: 'message.user_already_existed'
+        })
+        return
+      } else {
+        let id = results[0].id
+        return pool.promise('UPDATE users SET name = ?, pwd = SHA1(?), token = ?, ctime = NOW() WHERE id = ?', [ username, pwd, uuid, id ]).then(results => {
+          return Promise.resolve(id)
+        })
+      }
+    }
+  }).then(id => {
+    return pool.promise('SELECT id AS uid, email, token, name AS uname FROM users WHERE id = ?', [ id ])
+  }).then(results => {
+    res.send({
+      state: '000',
+      msg: '',
+      data: results[0]
+    })
+  }).catch((err) => {
+    console.error(err)
     res.send({
       state: '001',
       msg: 'message.signup_error'

@@ -111,7 +111,7 @@ app.get('/api/verifycode', (req, res) => {
         state: '001',
         msg: 'message.user_already_existed'
       })
-      return
+      return Promise.reject()
     }
     return pool.promise('INSERT INTO verifycodes(email, uuid, code, expire) VALUES(?, ?, ?, DATE_ADD(NOW(), INTERVAL 30 MINUTE))', [ req.query.email, uuid, code ])
   }).then(results => {
@@ -124,38 +124,35 @@ app.get('/api/verifycode', (req, res) => {
       ssl: true
     });
     let mailcontent = req.query.mailcontent
-    server.send({
+    let mailsender = req.query.mailsender
+    let mailsubject = req.query.mailsubject
+    server.promise = util.promisify(server.send)
+    return server.promise({
       text: mailcontent.replace('{code}', code),
-      from: `Sharelist <${config.mailuser}>`,
+      from: `${mailsender} <${config.mailuser}>`,
       to: req.query.email,
-      subject: "Verify Code",
+      subject: mailsubject,
       attachment:
       [
         { data: `<html><p>${mailcontent.replace('{code}', '<b>' + code + '</b>')}</p></html>`, alternative: true }
       ]
-    }, function (err, message) {
-      console.log(err, message)
-      if (err) {
-        res.send({
-          state: '001',
-          msg: 'message.mail_failure'
-        })
-        return
-      }
-      res.send({
-        state: '000',
-        msg: '',
-        data: {
-          uuid
-        }
-      })
-    });
-  }).catch((err) => {
-    logger.debug(err)
-    res.send({
-      state: '001',
-      msg: 'message.signup_error'
     })
+  }).then(message => {
+    res.send({
+      state: '000',
+      msg: '',
+      data: {
+        uuid
+      }
+    })
+  }).catch((err) => {
+    if (err instanceof Error) {
+      logger.debug(err)
+      res.send({
+        state: '001',
+        msg: 'message.signup_error'
+      })
+    }
   })
 })
 

@@ -339,9 +339,9 @@ io.on('connection', (socket) => {
       DATE_FORMAT(a.notify_date, \'%Y-%m-%d\') AS notify_date, DATE_FORMAT(a.notify_time, \'%H:%i\') AS notify_time 
       FROM tasks a, projects b WHERE a.pid = b.id AND b.uid = ${uid} AND a.state <> 2
       UNION
-      SELECT b.id, b.uid, b.content, b.pid, b.state, DATE_FORMAT(b.ctime, \'%Y-%m-%d %H:%i:%s\') AS ctime, 
-      DATE_FORMAT(b.notify_date, \'%Y-%m-%d\') AS notify_date, DATE_FORMAT(b.notify_time, \'%H:%i\') AS notify_time 
-      FROM shares a, tasks b WHERE a.uid = ${uid} AND a.pid = b.pid AND b.state <> 2`
+      SELECT a.id, a.uid, a.content, a.pid, a.state, DATE_FORMAT(a.ctime, \'%Y-%m-%d %H:%i:%s\') AS ctime, 
+      DATE_FORMAT(a.notify_date, \'%Y-%m-%d\') AS notify_date, DATE_FORMAT(a.notify_time, \'%H:%i\') AS notify_time 
+      FROM tasks a, shares b WHERE a.pid = b.pid AND b.uid = ${uid} AND a.state <> 2`
   let sql2 = `SELECT a.id, a.uid, u.name AS uname, a.name, DATE_FORMAT(a.ctime, \'%Y-%m-%d %H:%i:%s\') AS ctime, a.editable, \'\' AS control 
       FROM projects a, users u WHERE a.uid = ${uid} AND a.state = 0 AND a.uid = u.id
       UNION 

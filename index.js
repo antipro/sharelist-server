@@ -347,7 +347,7 @@ io.on('connection', (socket) => {
       UNION 
       SELECT a.id, a.uid, u.name AS uname, a.name, DATE_FORMAT(a.ctime, \'%Y-%m-%d %H:%i:%s\') AS ctime, \'\' AS editable, b.control 
       FROM projects a, shares b, users u WHERE b.uid = ${uid} AND a.id = b.pid AND a.state = 0 AND a.uid = u.id`
-  let sql3 = `SELECT DATE_FORMAT(notify_time, \'%H:%i\') AS notify_time FROM users WHERE id = ${uid}`
+  let sql3 = `SELECT DATE_FORMAT(notify_time, \'%H:%i\') AS notify_time, locale FROM users WHERE id = ${uid}`
   let callback = (results) => {
     let tasks = results[0]
     let projects = results[1]

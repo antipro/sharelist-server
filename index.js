@@ -191,7 +191,9 @@ app.get('/api/signup', (req, res) => {
       }
     }
   }).then(id => {
-    return pool.promise('SELECT id AS uid, email, token, name AS uname FROM users WHERE id = ?', [ id ])
+    return pool.promise('INSERT INTO projects(uid, name, editable) VALUES(?, \'\', \'N\')', [ id ]).then(results => {
+      return pool.promise('SELECT id AS uid, email, token, name AS uname FROM users WHERE id = ?', [ id ])
+    })
   }).then(results => {
     res.send({
       state: '000',
@@ -399,8 +401,8 @@ io.on('connection', (socket) => {
   /**
    * add task event
    */
-  socket.on('addtask', ({ pid, uid, content }) => {
-    pool.promise('INSERT INTO tasks SET ?', { uid, pid, content }).then((results, fields) => {
+  socket.on('addtask', ({ pid, uid, content, notify_date }) => {
+    pool.promise('INSERT INTO tasks SET ?', { uid, pid, content, notify_date }).then((results, fields) => {
       let id = results.insertId
       updateTimers(id)
       return pool.promise(`SELECT id, uid, content, pid, state, DATE_FORMAT(ctime, \'%Y-%m-%d %H:%i:%s\') AS ctime, 

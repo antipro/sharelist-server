@@ -329,27 +329,27 @@ io.on('connection', (socket) => {
     socket.disconnect()
     return
   }
-  let uid = socket.handshake.query.uid
-  logger.debug('user %d connected', uid)
-  if (!sockets[uid]) {
-    sockets[uid] = new Array()
+  let socketUid = socket.handshake.query.uid
+  logger.debug('user %d connected', socketUid)
+  if (!sockets[socketUid]) {
+    sockets[socketUid] = new Array()
   }
-  sockets[uid].push(socket)
+  sockets[socketUid].push(socket)
   logger.debug(sockets)
 
   let sql1 = `SELECT a.id, a.uid, a.content, a.pid, a.state, DATE_FORMAT(a.ctime, \'%Y-%m-%d %H:%i:%s\') AS ctime, 
       DATE_FORMAT(a.notify_date, \'%Y-%m-%d\') AS notify_date, DATE_FORMAT(a.notify_time, \'%H:%i\') AS notify_time 
-      FROM tasks a, projects b WHERE a.pid = b.id AND b.uid = ${uid} AND a.state <> 2
+      FROM tasks a, projects b WHERE a.pid = b.id AND b.uid = ${socketUid} AND a.state <> 2
       UNION
       SELECT a.id, a.uid, a.content, a.pid, a.state, DATE_FORMAT(a.ctime, \'%Y-%m-%d %H:%i:%s\') AS ctime, 
       DATE_FORMAT(a.notify_date, \'%Y-%m-%d\') AS notify_date, DATE_FORMAT(a.notify_time, \'%H:%i\') AS notify_time 
-      FROM tasks a, shares b WHERE a.pid = b.pid AND b.uid = ${uid} AND a.state <> 2`
+      FROM tasks a, shares b WHERE a.pid = b.pid AND b.uid = ${socketUid} AND a.state <> 2`
   let sql2 = `SELECT a.id, a.uid, u.name AS uname, a.name, DATE_FORMAT(a.ctime, \'%Y-%m-%d %H:%i:%s\') AS ctime, a.editable, \'\' AS control 
-      FROM projects a, users u WHERE a.uid = ${uid} AND a.state = 0 AND a.uid = u.id
+      FROM projects a, users u WHERE a.uid = ${socketUid} AND a.state = 0 AND a.uid = u.id
       UNION 
       SELECT a.id, a.uid, u.name AS uname, a.name, DATE_FORMAT(a.ctime, \'%Y-%m-%d %H:%i:%s\') AS ctime, \'\' AS editable, b.control 
-      FROM projects a, shares b, users u WHERE b.uid = ${uid} AND a.id = b.pid AND a.state = 0 AND a.uid = u.id`
-  let sql3 = `SELECT DATE_FORMAT(notify_time, \'%H:%i\') AS notify_time, locale FROM users WHERE id = ${uid}`
+      FROM projects a, shares b, users u WHERE b.uid = ${socketUid} AND a.id = b.pid AND a.state = 0 AND a.uid = u.id`
+  let sql3 = `SELECT DATE_FORMAT(notify_time, \'%H:%i\') AS notify_time, locale FROM users WHERE id = ${socketUid}`
   let callback = (results) => {
     let tasks = results[0]
     let projects = results[1]
@@ -590,9 +590,9 @@ io.on('connection', (socket) => {
    * update preference event
    */
   socket.on('updatepreference', preference => {
-    pool.promise('UPDATE users SET ? WHERE id = ' + uid, preference).then(results => {
-      if (sockets[uid]) {
-        sockets[uid].forEach(s => {
+    pool.promise('UPDATE users SET ? WHERE id = ' + socketUid, preference).then(results => {
+      if (sockets[socketUid]) {
+        sockets[socketUid].forEach(s => {
           s.emit('preference updated', preference)
         })
       }
@@ -601,7 +601,7 @@ io.on('connection', (socket) => {
           UNION
           SELECT a.id
           FROM tasks a, shares b WHERE b.uid = ? AND a.pid = b.pid AND a.state = 0 AND a.notify_date >= CURRENT_DATE AND a.notify_time IS NULL`
-      return pool.promise(sql, [ uid, uid ])
+      return pool.promise(sql, [ socketUid, socketUid ])
     }).then((results) => {
       results.forEach(task => {
         updateTimers(task.id)
@@ -616,15 +616,15 @@ io.on('connection', (socket) => {
    * disconnection event
    */
   socket.on('disconnect', () => {
-    logger.debug('user %d disconnected', uid)
-    sockets[uid] = sockets[uid].filter(s => s.id !== socket.id)
+    logger.debug('user %d disconnected', socketUid)
+    sockets[socketUid] = sockets[socketUid].filter(s => s.id !== socket.id)
     for(let id in timers) {
       clearTimeout(timers[id])
       delete timers[id]
     }
 
-    if (sockets[uid].length === 0)
-      delete sockets[uid]
+    if (sockets[socketUid].length === 0)
+      delete sockets[socketUid]
     logger.debug(sockets)
   })
 })

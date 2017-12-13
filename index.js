@@ -343,7 +343,11 @@ io.on('connection', (socket) => {
       UNION
       SELECT a.id, a.uid, a.content, a.pid, a.state, DATE_FORMAT(a.ctime, \'%Y-%m-%d %H:%i:%s\') AS ctime, 
       DATE_FORMAT(a.notify_date, \'%Y-%m-%d\') AS notify_date, DATE_FORMAT(a.notify_time, \'%H:%i\') AS notify_time 
-      FROM tasks a, shares b WHERE a.pid = b.pid AND b.uid = ${socketUid} AND a.state <> 2`
+      FROM tasks a, shares b WHERE a.pid = b.pid AND b.uid = ${socketUid} AND a.state <> 2
+      UNION
+      SELECT a.id, a.uid, a.content, a.pid, a.state, DATE_FORMAT(a.ctime, \'%Y-%m-%d %H:%i:%s\') AS ctime, 
+      DATE_FORMAT(a.notify_date, \'%Y-%m-%d\') AS notify_date, DATE_FORMAT(a.notify_time, \'%H:%i\') AS notify_time 
+      FROM tasks a WHERE a.pid = 0 AND a.uid = ${socketUid} AND a.state <> 2`
   let sql2 = `SELECT a.id, a.uid, u.name AS uname, a.name, DATE_FORMAT(a.ctime, \'%Y-%m-%d %H:%i:%s\') AS ctime, a.editable, \'\' AS control 
       FROM projects a, users u WHERE a.uid = ${socketUid} AND a.state = 0 AND a.uid = u.id
       UNION 
@@ -384,14 +388,18 @@ io.on('connection', (socket) => {
   /**
    * add project event
    */
-  socket.on('addproject', ({ uid, name }) => {
-    pool.promise('INSERT INTO projects SET ?', { uid, name }).then((results, fields) => {
-      let id = results.insertId
-      socket.join('project ' + id)
+  socket.on('addproject', ({ name }) => {
+    pool.promise('INSERT INTO projects SET ?', { uid: socketUid, name }).then((results, fields) => {
+      let pid = results.insertId
+      sockets[socketUid].forEach(s => {
+        s.join('project ' + pid)
+      })
       return pool.promise(`SELECT id AS id, uid, name, DATE_FORMAT(ctime, \'%Y-%m-%d %H:%i:%s\') AS ctime, editable, \'\' AS control 
-          FROM projects WHERE id = ?`, id)
+          FROM projects WHERE id = ?`, pid)
     }).then((results, fields) => {
-      socket.emit('project added', results[0])
+      sockets[socketUid].forEach(s => {
+        s.emit('project added', results[0])
+      })
     }).catch((err) => {
       console.error(err)
       socket.emit('error event', 'message.add_error')
@@ -401,8 +409,8 @@ io.on('connection', (socket) => {
   /**
    * add task event
    */
-  socket.on('addtask', ({ pid, uid, content, notify_date }) => {
-    pool.promise('INSERT INTO tasks SET ?', { uid, pid, content, notify_date }).then((results, fields) => {
+  socket.on('addtask', ({ pid, content, notify_date }) => {
+    pool.promise('INSERT INTO tasks SET ?', { uid: socketUid, pid, content, notify_date }).then((results, fields) => {
       let id = results.insertId
       updateTimers(id)
       return pool.promise(`SELECT id, uid, content, pid, state, DATE_FORMAT(ctime, \'%Y-%m-%d %H:%i:%s\') AS ctime, 
@@ -410,7 +418,13 @@ io.on('connection', (socket) => {
                             FROM tasks WHERE id = ?`, id)
     }).then((results, fields) => {
       let task = results[0]
-      socket.emit('task added', task).to('project ' + pid).emit('task added', task)
+      if (pid === 0) { // task wihtout project is private
+        sockets[socketUid].forEach(s => {
+          s.emit('task added', task)
+        })
+      } else {  // task with project shared with other
+        socket.emit('task added', task).to('project ' + pid).emit('task added', task)
+      }
     }).catch((err) => {
       console.error(err)
       socket.emit('error event', 'message.add_error')
@@ -453,7 +467,13 @@ io.on('connection', (socket) => {
    */
   socket.on('removetask', ({ id, pid }) => {
     pool.promise('UPDATE tasks SET state = 2 WHERE ?', { id }).then((results, fields) => {
-      socket.emit('task removed', id).to('project ' + pid).emit('task removed', id)
+      if (pid === 0) { // task wihtout project is private
+        sockets[socketUid].forEach(s => {
+          s.emit('task removed', id)
+        })
+      } else {  // task with project shared with other
+        socket.emit('task removed', id).to('project ' + pid).emit('task removed', id)
+      }
       updateTimers(id)
     }).catch((err) => {
       console.error(err)
@@ -471,7 +491,13 @@ io.on('connection', (socket) => {
           FROM tasks WHERE id = ?`, id)
     }).then((results) => {
       let task = results[0]
-      socket.emit('task toggled', task).to('project ' + pid).emit('task toggled', task)
+      if (pid === 0) { // task wihtout project is private
+        sockets[socketUid].forEach(s => {
+          s.emit('task toggled', task)
+        })
+      } else {  // task with project shared with other
+        socket.emit('task toggled', task).to('project ' + pid).emit('task toggled', task)
+      }
       updateTimers(id)
     }).catch((err) => {
       console.error(err)
@@ -578,7 +604,13 @@ io.on('connection', (socket) => {
           FROM tasks WHERE id = ?`, id)
     }).then(results => {
       let task = results[0]
-      socket.emit('task updated', task).to('project ' + pid).emit('task updated', task)
+      if (pid === 0) { // task wihtout project is private
+        sockets[socketUid].forEach(s => {
+          s.emit('task updated', task)
+        })
+      } else {  // task with project shared with other
+        socket.emit('task updated', task).to('project ' + pid).emit('task updated', task)
+      }
       updateTimers(id)
     }).catch(err => {
       console.error(err)

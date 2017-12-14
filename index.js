@@ -191,9 +191,7 @@ app.get('/api/signup', (req, res) => {
       }
     }
   }).then(id => {
-    return pool.promise('INSERT INTO projects(uid, name, editable) VALUES(?, \'\', \'N\')', [ id ]).then(results => {
-      return pool.promise('SELECT id AS uid, email, token, name AS uname FROM users WHERE id = ?', [ id ])
-    })
+    return pool.promise('SELECT id AS uid, email, token, name AS uname FROM users WHERE id = ?', [ id ])
   }).then(results => {
     res.send({
       state: '000',
@@ -233,8 +231,9 @@ app.get('/api/shares/:pid', (req, res) => {
  * Project info and tasks
  */
 app.get('/api/projects/:pid', (req, res) => {
-  let sql1 = `SELECT id, uid, content, pid, state, DATE_FORMAT(ctime, \'%Y-%m-%d %H:%i:%s\') AS ctime, DATE_FORMAT(notify_date, \'%Y-%m-%d\') AS notify_date 
-    FROM tasks WHERE pid = ${req.params.pid} AND state <> 2`
+  let sql1 = `SELECT a.id, a.uid, a.content, b.name AS pname, a.pid, a.state, DATE_FORMAT(a.ctime, \'%Y-%m-%d %H:%i:%s\') AS ctime, 
+    DATE_FORMAT(a.notify_date, \'%Y-%m-%d\') AS notify_date, DATE_FORMAT(a.notify_time, \'%H:%i\') AS notify_time 
+    FROM tasks a, projects b WHERE a.pid = ${req.params.pid} AND a.state <> 2 AND a.pid = b.id`
   let sql2 = `SELECT a.id, a.uid, u.name AS uname, a.name, DATE_FORMAT(a.ctime, \'%Y-%m-%d %H:%i:%s\') AS ctime, a.editable, \'\' AS control 
     FROM projects a, users u WHERE a.id = ${req.params.pid} AND a.uid = u.id`
   pool.promise(sql1 + ';' + sql2).then(results => {
@@ -280,11 +279,11 @@ function updateTimers (id) {
     })
   }
   timers[id] = new Array()
-  let sql = `SELECT a.id, a.content, b.uid, DATE_FORMAT(a.notify_date, \'%Y-%m-%d\') AS notify_date, DATE_FORMAT(IFNULL(a.notify_time, c.notify_time), \'%H:%i\') AS notify_time 
-    FROM tasks a, projects b, users c WHERE a.id = ? AND a.pid = b.id AND b.uid = c.id AND a.state = 0 AND a.notify_date >= CURRENT_DATE
+  let sql = `SELECT a.id, a.content, b.name AS pname, b.uid, DATE_FORMAT(a.notify_date, \'%Y-%m-%d\') AS notify_date, DATE_FORMAT(IFNULL(a.notify_time, u.notify_time), \'%H:%i\') AS notify_time 
+    FROM tasks a, projects b, users u WHERE a.id = ? AND a.pid = b.id AND b.uid = u.id AND a.state = 0 AND a.notify_date >= CURRENT_DATE
     UNION
-    SELECT a.id, a.content, b.uid, DATE_FORMAT(a.notify_date, \'%Y-%m-%d\') AS notify_date, DATE_FORMAT(IFNULL(a.notify_time, c.notify_time), \'%H:%i\') AS notify_time 
-    FROM tasks a, shares b, users c WHERE a.id = ? AND b.uid = c.id AND a.pid = b.pid AND a.state = 0 AND a.notify_date >= CURRENT_DATE`
+    SELECT a.id, a.content, c.name AS pname, b.uid, DATE_FORMAT(a.notify_date, \'%Y-%m-%d\') AS notify_date, DATE_FORMAT(IFNULL(a.notify_time, u.notify_time), \'%H:%i\') AS notify_time 
+    FROM tasks a, shares b, projects c, users u WHERE a.id = ? AND b.uid = u.id AND a.pid = b.pid AND b.pid = c.id AND a.state = 0 AND a.notify_date >= CURRENT_DATE`
   pool.promise(sql, [ id, id ]).then(results => {
     results.forEach(task => {
       let current_time = Date.now()
@@ -337,15 +336,15 @@ io.on('connection', (socket) => {
   sockets[socketUid].push(socket)
   logger.debug(sockets)
 
-  let sql1 = `SELECT a.id, a.uid, a.content, a.pid, a.state, DATE_FORMAT(a.ctime, \'%Y-%m-%d %H:%i:%s\') AS ctime, 
+  let sql1 = `SELECT a.id, a.uid, a.content, b.name AS pname, a.pid, a.state, DATE_FORMAT(a.ctime, \'%Y-%m-%d %H:%i:%s\') AS ctime, 
       DATE_FORMAT(a.notify_date, \'%Y-%m-%d\') AS notify_date, DATE_FORMAT(a.notify_time, \'%H:%i\') AS notify_time 
       FROM tasks a, projects b WHERE a.pid = b.id AND b.uid = ${socketUid} AND a.state <> 2
       UNION
-      SELECT a.id, a.uid, a.content, a.pid, a.state, DATE_FORMAT(a.ctime, \'%Y-%m-%d %H:%i:%s\') AS ctime, 
+      SELECT a.id, a.uid, a.content, c.name AS pname, a.pid, a.state, DATE_FORMAT(a.ctime, \'%Y-%m-%d %H:%i:%s\') AS ctime, 
       DATE_FORMAT(a.notify_date, \'%Y-%m-%d\') AS notify_date, DATE_FORMAT(a.notify_time, \'%H:%i\') AS notify_time 
-      FROM tasks a, shares b WHERE a.pid = b.pid AND b.uid = ${socketUid} AND a.state <> 2
+      FROM tasks a, shares b, projects c WHERE a.pid = b.pid AND b.pid = c.id AND b.uid = ${socketUid} AND a.state <> 2
       UNION
-      SELECT a.id, a.uid, a.content, a.pid, a.state, DATE_FORMAT(a.ctime, \'%Y-%m-%d %H:%i:%s\') AS ctime, 
+      SELECT a.id, a.uid, a.content, '' AS pname, a.pid, a.state, DATE_FORMAT(a.ctime, \'%Y-%m-%d %H:%i:%s\') AS ctime, 
       DATE_FORMAT(a.notify_date, \'%Y-%m-%d\') AS notify_date, DATE_FORMAT(a.notify_time, \'%H:%i\') AS notify_time 
       FROM tasks a WHERE a.pid = 0 AND a.uid = ${socketUid} AND a.state <> 2`
   let sql2 = `SELECT a.id, a.uid, u.name AS uname, a.name, DATE_FORMAT(a.ctime, \'%Y-%m-%d %H:%i:%s\') AS ctime, a.editable, \'\' AS control 
@@ -413,9 +412,9 @@ io.on('connection', (socket) => {
     pool.promise('INSERT INTO tasks SET ?', { uid: socketUid, pid, content, notify_date }).then((results, fields) => {
       let id = results.insertId
       updateTimers(id)
-      return pool.promise(`SELECT id, uid, content, pid, state, DATE_FORMAT(ctime, \'%Y-%m-%d %H:%i:%s\') AS ctime, 
-                            DATE_FORMAT(notify_date, \'%Y-%m-%d\') AS notify_date, DATE_FORMAT(notify_time, \'%H:%i\') AS notify_time 
-                            FROM tasks WHERE id = ?`, id)
+      return pool.promise(`SELECT a.id, a.uid, a.content, IFNULL(b.name, '') AS pname, a.pid, a.state, DATE_FORMAT(a.ctime, \'%Y-%m-%d %H:%i:%s\') AS ctime, 
+                            DATE_FORMAT(a.notify_date, \'%Y-%m-%d\') AS notify_date, DATE_FORMAT(a.notify_time, \'%H:%i\') AS notify_time 
+                            FROM tasks a LEFT JOIN projects b ON a.pid = b.id WHERE a.id = ?`, id)
     }).then((results, fields) => {
       let task = results[0]
       if (pid === 0) { // task wihtout project is private
@@ -486,9 +485,9 @@ io.on('connection', (socket) => {
    */
   socket.on('toggletask', ({ id, state, pid }) => {
     pool.promise('UPDATE tasks SET state = ? WHERE id = ?', [ state, id ]).then((results) => {
-      return pool.promise(`SELECT id, uid, content, pid, state, DATE_FORMAT(ctime, \'%Y-%m-%d %H:%i:%s\') AS ctime, 
-          DATE_FORMAT(notify_date, \'%Y-%m-%d\') AS notify_date, DATE_FORMAT(notify_time, \'%H:%i\') AS notify_time 
-          FROM tasks WHERE id = ?`, id)
+      return pool.promise(`SELECT a.id, a.uid, a.content, IFNULL(b.name, '') AS pname, a.pid, a.state, DATE_FORMAT(a.ctime, \'%Y-%m-%d %H:%i:%s\') AS ctime, 
+          DATE_FORMAT(a.notify_date, \'%Y-%m-%d\') AS notify_date, DATE_FORMAT(a.notify_time, \'%H:%i\') AS notify_time 
+          FROM tasks a LEFT JOIN projects b WHERE a.id = ?`, id)
     }).then((results) => {
       let task = results[0]
       if (pid === 0) { // task wihtout project is private
@@ -599,9 +598,9 @@ io.on('connection', (socket) => {
       notify_time = null
     }
     pool.promise('UPDATE tasks SET content = ?, notify_date = ?, notify_time = ? WHERE id = ?', [content, notify_date, notify_time, id]).then(results => {
-      return pool.promise(`SELECT id, uid, content, pid, state, DATE_FORMAT(ctime, \'%Y-%m-%d %H:%i:%s\') AS ctime, 
-          DATE_FORMAT(notify_date, \'%Y-%m-%d\') AS notify_date, DATE_FORMAT(notify_time, \'%H:%i\') AS notify_time 
-          FROM tasks WHERE id = ?`, id)
+      return pool.promise(`SELECT a.id, a.uid, a.content, IFNULL(b.name, '') AS pname, a.pid, a.state, DATE_FORMAT(a.ctime, \'%Y-%m-%d %H:%i:%s\') AS ctime, 
+          DATE_FORMAT(a.notify_date, \'%Y-%m-%d\') AS notify_date, DATE_FORMAT(a.notify_time, \'%H:%i\') AS notify_time 
+          FROM tasks a LEFT JOIN projects b ON a.pid = b.id WHERE a.id = ?`, id)
     }).then(results => {
       let task = results[0]
       if (pid === 0) { // task wihtout project is private
@@ -632,8 +631,11 @@ io.on('connection', (socket) => {
           FROM tasks a, projects b WHERE b.uid = ? AND a.pid = b.id AND a.state = 0 AND a.notify_date >= CURRENT_DATE AND a.notify_time IS NULL
           UNION
           SELECT a.id
-          FROM tasks a, shares b WHERE b.uid = ? AND a.pid = b.pid AND a.state = 0 AND a.notify_date >= CURRENT_DATE AND a.notify_time IS NULL`
-      return pool.promise(sql, [ socketUid, socketUid ])
+          FROM tasks a, shares b WHERE b.uid = ? AND a.pid = b.pid AND a.state = 0 AND a.notify_date >= CURRENT_DATE AND a.notify_time IS NULL
+          UNION
+          SELECT a.id
+          FROM tasks a WHERE a.uid = ? AND a.pid = 0 AND a.state = 0 AND a.notify_date >= CURRENT_DATE AND a.notify_time IS NULL`
+      return pool.promise(sql, [ socketUid, socketUid, socketUid ])
     }).then((results) => {
       results.forEach(task => {
         updateTimers(task.id)

@@ -487,7 +487,7 @@ io.on('connection', (socket) => {
     pool.promise('UPDATE tasks SET state = ? WHERE id = ?', [ state, id ]).then((results) => {
       return pool.promise(`SELECT a.id, a.uid, a.content, IFNULL(b.name, '') AS pname, a.pid, a.state, DATE_FORMAT(a.ctime, \'%Y-%m-%d %H:%i:%s\') AS ctime, 
           DATE_FORMAT(a.notify_date, \'%Y-%m-%d\') AS notify_date, DATE_FORMAT(a.notify_time, \'%H:%i\') AS notify_time 
-          FROM tasks a LEFT JOIN projects b WHERE a.id = ?`, id)
+          FROM tasks a LEFT JOIN projects b ON a.pid = b.id WHERE a.id = ?`, id)
     }).then((results) => {
       let task = results[0]
       if (pid === 0) { // task wihtout project is private

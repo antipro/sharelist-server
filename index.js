@@ -329,7 +329,8 @@ io.on('connection', (socket) => {
     return
   }
   let socketUid = socket.handshake.query.uid
-  logger.debug('user %d connected', socketUid)
+  let socketUname = socket.handshake.query.uname
+  logger.debug('user %d:%s connected', socketUid, socketUname)
   if (!sockets[socketUid]) {
     sockets[socketUid] = new Array()
   }
@@ -422,7 +423,7 @@ io.on('connection', (socket) => {
           s.emit('task added', task)
         })
       } else {  // task with project shared with other
-        socket.emit('task added', task).to('project ' + pid).emit('task added', task)
+        socket.emit('task added', task).to('project ' + pid).emit('task added', task, { uid: socketUid, uname: socketUname })
       }
     }).catch((err) => {
       console.error(err)
@@ -433,11 +434,11 @@ io.on('connection', (socket) => {
   /**
    * remove project event
    */
-  socket.on('removeproject', ({ pid }) => {
+  socket.on('removeproject', ({ pid, pname }) => {
     pool.promise('UPDATE projects SET state = 1 WHERE id = ?', [ pid ]).then(() => {
       return pool.promise('UPDATE tasks SET state = 2 WHERE pid = ?', [ pid ])
     }).then(() => {
-      socket.emit('project removed', pid).to('project ' + pid).emit('project removed', pid)
+      socket.emit('project removed', pid, pname).to('project ' + pid).emit('project removed', pid, pname, { uid: socketUid, uname: socketUname })
       socket.leave('project ' + pid)
       return pool.promise('SELECT uid FROM shares WHERE pid = ?', [ pid ])
     }).then((results) => {
@@ -464,14 +465,14 @@ io.on('connection', (socket) => {
   /**
    * remove task event
    */
-  socket.on('removetask', ({ id, pid }) => {
+  socket.on('removetask', ({ id, pid, content }) => {
     pool.promise('UPDATE tasks SET state = 2 WHERE ?', { id }).then((results, fields) => {
       if (pid === 0) { // task wihtout project is private
         sockets[socketUid].forEach(s => {
           s.emit('task removed', id)
         })
       } else {  // task with project shared with other
-        socket.emit('task removed', id).to('project ' + pid).emit('task removed', id)
+        socket.emit('task removed', id, content).to('project ' + pid).emit('task removed', id, content, { uid: socketUid, uname: socketUname })
       }
       updateTimers(id)
     }).catch((err) => {
@@ -495,7 +496,7 @@ io.on('connection', (socket) => {
           s.emit('task toggled', task)
         })
       } else {  // task with project shared with other
-        socket.emit('task toggled', task).to('project ' + pid).emit('task toggled', task)
+        socket.emit('task toggled', task).to('project ' + pid).emit('task toggled', task, { uid: socketUid, uname: socketUname })
       }
       updateTimers(id)
     }).catch((err) => {
@@ -516,6 +517,9 @@ io.on('connection', (socket) => {
       }).to('project ' + pid).emit('project updated', {
         id: pid,
         name: pname
+      }, {
+        uid: socketUid,
+        uname: socketUname
       })
       return pool.promise('SELECT uid FROM shares WHERE pid = ?', [ pid ])
     }).then((results) => {
@@ -529,7 +533,7 @@ io.on('connection', (socket) => {
           return pool.promise('DELETE FROM shares WHERE pid = ? AND uid = ?', [ pid, uid ]).then((results) => {
             if (sockets[uid]) {
               sockets[uid].forEach(s => {
-                s.emit('project unshared', pid).leave('project ' + pid)
+                s.emit('project unshared', pid, { uname: socketUname }).leave('project ' + pid)
               })
             }
             return Promise.resolve()
@@ -572,7 +576,7 @@ io.on('connection', (socket) => {
       uids.forEach(uid => {
         if (sockets[uid]) {
           sockets[uid].forEach(s => {
-            s.emit('project shared', pid).join('project ' + pid)
+            s.emit('project shared', pid, { uname: socketUname }).join('project ' + pid)
           })
         }
       })
@@ -608,7 +612,7 @@ io.on('connection', (socket) => {
           s.emit('task updated', task)
         })
       } else {  // task with project shared with other
-        socket.emit('task updated', task).to('project ' + pid).emit('task updated', task)
+        socket.emit('task updated', task).to('project ' + pid).emit('task updated', task, { uid: socketUid, uname: socketUname })
       }
       updateTimers(id)
     }).catch(err => {

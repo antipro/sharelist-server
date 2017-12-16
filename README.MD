@@ -1,9 +1,34 @@
-# Sharelist server-side program
+# Sharelist
 
-Requirement
+> server-side program
+
+## Requirement
 -------------------
 * Nodejs 8.x+
+* MySQL 5.7
 
-Database
--------------------
-* MySQL
+## Preparation
+
+create ./config.js, like below:
+```
+exports.config = {
+  host: 'IP',
+  user: 'username',
+  password: 'password',
+  database: 'databasename',
+  mailuser: 'mailaddress',
+  mailpwd: 'mailpassword',
+  smtpserver: 'smtpserver',
+  smtpport: smtpport
+}
+```
+
+## Build Setup
+
+``` bash
+# install dependencies
+npm install
+
+# start express server
+node index.js
+```

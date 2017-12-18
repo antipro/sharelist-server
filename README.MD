@@ -9,6 +9,8 @@
 
 ## Preparation
 
+use ./sharelist.sql to prepare mysql database.
+
 create ./config.js, like below:
 ```
 exports.config = {

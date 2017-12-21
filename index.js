@@ -389,18 +389,19 @@ io.on('connection', (socket) => {
    * add project event
    */
   socket.on('addproject', ({ name }) => {
-    pool.promise('INSERT INTO projects SET ?', { uid: socketUid, name }).then((results, fields) => {
-      let pid = results.insertId
+    (async () => {
+      let result = await pool.promise('INSERT INTO projects SET ?', { uid: socketUid, name })
+      let pid = result.insertId
       sockets[socketUid].forEach(s => {
         s.join('project ' + pid)
       })
-      return pool.promise(`SELECT id AS id, uid, name, DATE_FORMAT(ctime, \'%Y-%m-%d %H:%i:%s\') AS ctime, editable, \'\' AS control 
-          FROM projects WHERE id = ?`, pid)
-    }).then((results, fields) => {
+      let results = await pool.promise(`SELECT id AS id, uid, name, DATE_FORMAT(ctime, \'%Y-%m-%d %H:%i:%s\') AS ctime, editable, \'\' AS control 
+        FROM projects WHERE id = ?`, pid)
+      let project = results[0]
       sockets[socketUid].forEach(s => {
-        s.emit('project added', results[0])
+        s.emit('project added', project)
       })
-    }).catch((err) => {
+    })().catch((err) => {
       console.error(err)
       socket.emit('error event', 'message.add_error')
     })
@@ -410,13 +411,14 @@ io.on('connection', (socket) => {
    * add task event
    */
   socket.on('addtask', ({ pid, content, notify_date }) => {
-    pool.promise('INSERT INTO tasks SET ?', { uid: socketUid, pid, content, notify_date }).then((results, fields) => {
-      let id = results.insertId
+    (async () => {
+      let result = await pool.promise('INSERT INTO tasks SET ?', { uid: socketUid, pid, content, notify_date })
+      let id = result.insertId
       updateTimers(id)
-      return pool.promise(`SELECT a.id, a.uid, a.content, IFNULL(b.name, '') AS pname, a.pid, a.state, DATE_FORMAT(a.ctime, \'%Y-%m-%d %H:%i:%s\') AS ctime, 
-                            DATE_FORMAT(a.notify_date, \'%Y-%m-%d\') AS notify_date, DATE_FORMAT(a.notify_time, \'%H:%i\') AS notify_time 
-                            FROM tasks a LEFT JOIN projects b ON a.pid = b.id WHERE a.id = ?`, id)
-    }).then((results, fields) => {
+
+      let results = await pool.promise(`SELECT a.id, a.uid, a.content, IFNULL(b.name, '') AS pname, a.pid, a.state, DATE_FORMAT(a.ctime, \'%Y-%m-%d %H:%i:%s\') AS ctime, 
+        DATE_FORMAT(a.notify_date, \'%Y-%m-%d\') AS notify_date, DATE_FORMAT(a.notify_time, \'%H:%i\') AS notify_time 
+        FROM tasks a LEFT JOIN projects b ON a.pid = b.id WHERE a.id = ?`, id)
       let task = results[0]
       if (pid === 0) { // task wihtout project is private
         sockets[socketUid].forEach(s => {
@@ -425,7 +427,7 @@ io.on('connection', (socket) => {
       } else {  // task with project shared with other
         socket.emit('task added', task).to('project ' + pid).emit('task added', task, { uid: socketUid, uname: socketUname })
       }
-    }).catch((err) => {
+    })().catch((err) => {
       console.error(err)
       socket.emit('error event', 'message.add_error')
     })
@@ -435,13 +437,13 @@ io.on('connection', (socket) => {
    * remove project event
    */
   socket.on('removeproject', ({ pid, pname }) => {
-    pool.promise('UPDATE projects SET state = 1 WHERE id = ?', [ pid ]).then(() => {
-      return pool.promise('UPDATE tasks SET state = 2 WHERE pid = ?', [ pid ])
-    }).then(() => {
+    (async () => {
+      await pool.promise('UPDATE projects SET state = 1 WHERE id = ?', [ pid ])
+      await pool.promise('UPDATE tasks SET state = 2 WHERE pid = ?', [ pid ])
       socket.emit('project removed', pid, pname).to('project ' + pid).emit('project removed', pid, pname, { uid: socketUid, uname: socketUname })
       socket.leave('project ' + pid)
-      return pool.promise('SELECT uid FROM shares WHERE pid = ?', [ pid ])
-    }).then((results) => {
+
+      let results = await pool.promise('SELECT uid FROM shares WHERE pid = ?', [ pid ])
       results.forEach(uid => {
         if (sockets[uid]) {
           sockets[uid].forEach(s => {
@@ -449,14 +451,13 @@ io.on('connection', (socket) => {
           })
         }
       })
-      return pool.promise('DELETE FROM shares WHERE pid = ?', [ pid ])
-    }).then(() => {
-      return pool.promise('SELECT id FROM tasks WHERE pid = ?', [ pid ])
-    }).then(results => {
+      await pool.promise('DELETE FROM shares WHERE pid = ?', [ pid ])
+
+      results = await pool.promise('SELECT id FROM tasks WHERE pid = ?', [ pid ])
       results.forEach(task => {
         updateTimers(task.id)
       })
-    }).catch((err) => {
+    })().catch((err) => {
       console.error(err)
       socket.emit('error event', 'message.remove_error')
     })
@@ -466,16 +467,19 @@ io.on('connection', (socket) => {
    * remove task event
    */
   socket.on('removetask', ({ id, pid, content }) => {
-    pool.promise('UPDATE tasks SET state = 2 WHERE ?', { id }).then((results, fields) => {
-      if (pid === 0) { // task wihtout project is private
-        sockets[socketUid].forEach(s => {
-          s.emit('task removed', id)
-        })
-      } else {  // task with project shared with other
-        socket.emit('task removed', id, content).to('project ' + pid).emit('task removed', id, content, { uid: socketUid, uname: socketUname })
+    (async () => {
+      let result = await pool.promise('UPDATE tasks SET state = 2 WHERE ?', { id })
+      if (result.affectedRows > 0) {
+        if (pid === 0) { // task wihtout project is private
+          sockets[socketUid].forEach(s => {
+            s.emit('task removed', id)
+          })
+        } else {  // task with project shared with other
+          socket.emit('task removed', id, content).to('project ' + pid).emit('task removed', id, content, { uid: socketUid, uname: socketUname })
+        }
+        updateTimers(id)
       }
-      updateTimers(id)
-    }).catch((err) => {
+    })().catch((err) => {
       console.error(err)
       socket.emit('error event', 'message.remove_error')
     })
@@ -485,11 +489,11 @@ io.on('connection', (socket) => {
    * toggle task event
    */
   socket.on('toggletask', ({ id, state, pid }) => {
-    pool.promise('UPDATE tasks SET state = ? WHERE id = ?', [ state, id ]).then((results) => {
-      return pool.promise(`SELECT a.id, a.uid, a.content, IFNULL(b.name, '') AS pname, a.pid, a.state, DATE_FORMAT(a.ctime, \'%Y-%m-%d %H:%i:%s\') AS ctime, 
-          DATE_FORMAT(a.notify_date, \'%Y-%m-%d\') AS notify_date, DATE_FORMAT(a.notify_time, \'%H:%i\') AS notify_time 
-          FROM tasks a LEFT JOIN projects b ON a.pid = b.id WHERE a.id = ?`, id)
-    }).then((results) => {
+    (async () => {
+      await pool.promise('UPDATE tasks SET state = ? WHERE id = ?', [ state, id ])
+      let results = await pool.promise(`SELECT a.id, a.uid, a.content, IFNULL(b.name, '') AS pname, a.pid, a.state, DATE_FORMAT(a.ctime, \'%Y-%m-%d %H:%i:%s\') AS ctime, 
+        DATE_FORMAT(a.notify_date, \'%Y-%m-%d\') AS notify_date, DATE_FORMAT(a.notify_time, \'%H:%i\') AS notify_time 
+        FROM tasks a LEFT JOIN projects b ON a.pid = b.id WHERE a.id = ?`, id)
       let task = results[0]
       if (pid === 0) { // task wihtout project is private
         sockets[socketUid].forEach(s => {
@@ -499,10 +503,9 @@ io.on('connection', (socket) => {
         socket.emit('task toggled', task).to('project ' + pid).emit('task toggled', task, { uid: socketUid, uname: socketUname })
       }
       updateTimers(id)
-    }).catch((err) => {
+    })().catch((err) => {
       console.error(err)
       socket.emit('error event', 'message.update_error')
-      return
     })
   })
 
@@ -510,82 +513,71 @@ io.on('connection', (socket) => {
    * update project event
    */
   socket.on('updateproject', ({ pid, pname, shares }) => {
-    pool.promise('UPDATE projects SET name = ? WHERE id = ?', [ pname, pid ]).then((results) => {
-      socket.emit('project updated', {
-        id: pid,
-        name: pname
-      }).to('project ' + pid).emit('project updated', {
-        id: pid,
-        name: pname
-      }, {
-        uid: socketUid,
-        uname: socketUname
-      })
-      return pool.promise('SELECT uid FROM shares WHERE pid = ?', [ pid ])
-    }).then((results) => {
+    (async () => {
+      let result = await pool.promise('UPDATE projects SET name = ? WHERE id = ?', [ pname, pid ])
+      if (result.affectedRows > 0) {
+        socket.emit('project updated', {
+          id: pid,
+          name: pname
+        }).to('project ' + pid).emit('project updated', {
+          id: pid,
+          name: pname
+        }, {
+          uid: socketUid,
+          uname: socketUname
+        })
+      }
+      
       console.debug('unshared project event')
+      let results = await pool.promise('SELECT uid FROM shares WHERE pid = ?', [ pid ])
       const old_uids = results.map(row => row.uid)
       const new_uids = shares.map(share => share.uid)
-      return Promise.all(old_uids.map(uid => {
+      old_uids.map(uid => {
         // withdraw sharing
         if (new_uids.indexOf(uid) === -1) {
           logger.debug('unshared with %d', uid)
-          return pool.promise('DELETE FROM shares WHERE pid = ? AND uid = ?', [ pid, uid ]).then((results) => {
-            if (sockets[uid]) {
-              sockets[uid].forEach(s => {
-                s.emit('project unshared', pid, { uname: socketUname }).leave('project ' + pid)
-              })
-            }
-            return Promise.resolve()
-          })
-        }
-      }))
-    }).then(() => {
-      console.debug('add new user if not existed')
-      return Promise.all(shares.map(share => {
-        if (share.uid !== 0) {
-          return Promise.resolve(share.uid)
-        } else {
-          return pool.promise('SELECT id FROM users WHERE email = ?', [ share.email ]).then(results => {
-            if (results.length === 0) {
-              // add new user
-              return pool.promise('INSERT INTO users SET ?', { email: share.email }).then(results => {
-                return Promise.resolve(results.insertId)
-              })
-            } else {
-              return Promise.resolve(results[0].id)
-            }
-          })
-        }
-      }))
-    }).then(uids => {
-      console.debug('add new share relationship %s', uids)
-      return Promise.all(uids.map((uid) => {
-        return pool.promise('SELECT 1 FROM shares WHERE pid = ? AND uid = ?', [pid, uid]).then(results => {
-          if (results.length === 0) {
-            return pool.promise('INSERT INTO shares SET ?', { pid, uid }).then(results => {
-              return Promise.resolve(uid)
+          pool.promise('DELETE FROM shares WHERE pid = ? AND uid = ?', [ pid, uid ])
+          if (sockets[uid]) {
+            sockets[uid].forEach(s => {
+              s.emit('project unshared', pid, { uname: socketUname }).leave('project ' + pid)
             })
-          } else {
-            return Promise.resolve(uid)
           }
-        })
-      }))
-    }).then(uids => {
-      console.debug('share project event')
-      uids.forEach(uid => {
-        if (sockets[uid]) {
-          sockets[uid].forEach(s => {
+        }
+      })
+
+      console.debug('add new user if not existed')
+      for (let idx = 0; idx < shares.length; idx++) {
+        const share = shares[idx];
+        if (share.uid === 0) {
+          results = await pool.promise('SELECT id FROM users WHERE email = ?', [ share.email ])
+          if (results.length === 0) {
+            result = await pool.promise('INSERT INTO users SET ?', { email: share.email })
+            share.uid = result.insertId
+          } else {
+            share.uid = results[0].id
+          }
+        }
+      }
+
+      console.debug('add new share relationship %s and share project event', shares)
+      for (let share of shares) {
+        results = await pool.promise('SELECT 1 FROM shares WHERE pid = ? AND uid = ?', [pid, share.uid])
+        if (results.length === 0) {
+          await pool.promise('INSERT INTO shares SET ?', { pid, uid: share.uid })
+        }
+        if (sockets[share.uid]) {
+          sockets[share.uid].forEach(s => {
             s.emit('project shared', pid, { uname: socketUname }).join('project ' + pid)
           })
         }
-      })
-      return pool.promise('SELECT id FROM tasks WHERE pid = ?', [ pid ])
-    }).then((results) => {
+      }
+
+      console.debug('update timer')
+      results = await pool.promise('SELECT id FROM tasks WHERE pid = ?', [ pid ])
       results.forEach(task => {
         updateTimers(task.id)
       })
-    }).catch((err) => {
+    })().catch(err => {
       console.error(err)
       socket.emit('error event', 'message.update_error')
     })
@@ -595,27 +587,30 @@ io.on('connection', (socket) => {
    * update task event
    */
   socket.on('updatetask', ({ id, pid, content, notify_date, notify_time }) => {
-    if (notify_date === '') {
-      notify_date = null
-    }
-    if (notify_time === '') {
-      notify_time = null
-    }
-    pool.promise('UPDATE tasks SET content = ?, notify_date = ?, notify_time = ? WHERE id = ?', [content, notify_date, notify_time, id]).then(results => {
-      return pool.promise(`SELECT a.id, a.uid, a.content, IFNULL(b.name, '') AS pname, a.pid, a.state, DATE_FORMAT(a.ctime, \'%Y-%m-%d %H:%i:%s\') AS ctime, 
+    (async () => {
+      if (notify_date === '') {
+        notify_date = null
+      }
+      if (notify_time === '') {
+        notify_time = null
+      }
+      let result = await pool.promise('UPDATE tasks SET content = ?, notify_date = ?, notify_time = ? WHERE id = ?', [content, notify_date, notify_time, id])
+      if (result.affectedRows > 0) {
+        let results = await pool.promise(`SELECT a.id, a.uid, a.content, IFNULL(b.name, '') AS pname, a.pid, a.state, DATE_FORMAT(a.ctime, \'%Y-%m-%d %H:%i:%s\') AS ctime, 
           DATE_FORMAT(a.notify_date, \'%Y-%m-%d\') AS notify_date, DATE_FORMAT(a.notify_time, \'%H:%i\') AS notify_time 
           FROM tasks a LEFT JOIN projects b ON a.pid = b.id WHERE a.id = ?`, id)
-    }).then(results => {
-      let task = results[0]
-      if (pid === 0) { // task wihtout project is private
-        sockets[socketUid].forEach(s => {
-          s.emit('task updated', task)
-        })
-      } else {  // task with project shared with other
-        socket.emit('task updated', task).to('project ' + pid).emit('task updated', task, { uid: socketUid, uname: socketUname })
+  
+        let task = results[0]
+        if (pid === 0) { // task wihtout project is private
+          sockets[socketUid].forEach(s => {
+            s.emit('task updated', task)
+          })
+        } else {  // task with project shared with other
+          socket.emit('task updated', task).to('project ' + pid).emit('task updated', task, { uid: socketUid, uname: socketUname })
+        }
+        updateTimers(id)
       }
-      updateTimers(id)
-    }).catch(err => {
+    })().catch(err => {
       console.error(err)
       socket.emit('error event', 'message.update_error')
     })

@@ -620,7 +620,8 @@ io.on('connection', (socket) => {
    * update preference event
    */
   socket.on('updatepreference', preference => {
-    pool.promise('UPDATE users SET ? WHERE id = ' + socketUid, preference).then(results => {
+    (async () => {
+      await pool.promise('UPDATE users SET ? WHERE id = ' + socketUid, preference)
       if (sockets[socketUid]) {
         sockets[socketUid].forEach(s => {
           s.emit('preference updated', preference)
@@ -634,12 +635,11 @@ io.on('connection', (socket) => {
           UNION
           SELECT a.id
           FROM tasks a WHERE a.uid = ? AND a.pid = 0 AND a.state = 0 AND a.notify_date >= CURRENT_DATE AND a.notify_time IS NULL`
-      return pool.promise(sql, [ socketUid, socketUid, socketUid ])
-    }).then((results) => {
+      let results = await pool.promise(sql, [ socketUid, socketUid, socketUid ])
       results.forEach(task => {
         updateTimers(task.id)
       })
-    }).catch(err => {
+    })().catch(err => {
       console.error(err)
       socket.emit('error event', 'message.update_error')
     })

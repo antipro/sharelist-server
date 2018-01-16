@@ -13,3 +13,4 @@ nohup.out
 
 logs/
 config.js
+.env

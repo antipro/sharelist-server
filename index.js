@@ -37,7 +37,7 @@ try {
     smtpserver: 'smtpserver',
     smtpport: smtpport
   }`)
-  console.log(process.env.host)
+  console.log(process.env)
   return -1
 }
 // init connnection pool of database

@@ -676,6 +676,6 @@ io.on('connection', (socket) => {
   })
 })
 
-http.listen(3000, () => {
-  logger.debug('listening on *:3000')
+http.listen(process.env.PORT || 5000, () => {
+  logger.debug('listening on *:%d', process.env.PORT || 5000)
 })

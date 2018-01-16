@@ -22,24 +22,37 @@ var http = require('http').Server(app)
 var io = require('socket.io')(http, { origins: '*:*' })
 const util = require('util')
 
-try {
-  var config = require('./config.js').config
-} catch (error) {
-  console.log('Please create config.js file.')
-  console.log('Content like this:')
-  console.log(`exports.config = {
-    host: 'host',
-    user: 'user',
-    password: 'password',
-    database: 'database',
-    mailuser: 'mailuser',
-    mailpwd: 'mailpwd',
-    smtpserver: 'smtpserver',
-    smtpport: smtpport
-  }`)
-  console.log(process.env)
-  return -1
+if (process.env['DYNO'] !== undefined) {
+  var config = {
+    host: process.env.host,
+    user: process.env.user,
+    password: process.env.password,
+    database: process.env.database,
+    mailuser: process.env.mailuser,
+    mailpwd: process.env.mailpwd,
+    smtpserver: process.env.smtpserver,
+    smtpport: parseInt(process.env.smtpport)
+  }
+} else {
+  try {
+    var config = require('./config.js').config
+  } catch (error) {
+    console.log('Please create config.js file.')
+    console.log('Content like this:')
+    console.log(`exports.config = {
+      host: 'host',
+      user: 'user',
+      password: 'password',
+      database: 'database',
+      mailuser: 'mailuser',
+      mailpwd: 'mailpwd',
+      smtpserver: 'smtpserver',
+      smtpport: smtpport
+    }`)
+    process.exit(-1)
+  }
 }
+
 // init connnection pool of database
 const pool = require('mysql').createPool({
   host     : config.host,

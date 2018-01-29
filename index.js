@@ -170,6 +170,9 @@ app.get('/api/verifycode', (req, res) => {
   })
 })
 
+/**
+ * Sign Up
+ */
 app.get('/api/signup', (req, res) => {
   let email = req.query.email;
   let username = req.query.username;
@@ -294,15 +297,18 @@ function updateTimers (id) {
     })
   }
   timers[id] = new Array()
-  let sql = `SELECT a.id, a.content, b.name AS pname, b.uid, DATE_FORMAT(a.notify_date, \'%Y-%m-%d\') AS notify_date, DATE_FORMAT(IFNULL(a.notify_time, u.notify_time), \'%H:%i\') AS notify_time 
-    FROM tasks a, projects b, users u WHERE a.id = ? AND a.pid = b.id AND b.uid = u.id AND a.state = 0 AND a.notify_date >= CURRENT_DATE
+  // Query all users related with this task
+  let sql = `SELECT a.id, a.content, b.name AS pname, b.uid, DATE_FORMAT(a.notify_date, \'%Y-%m-%d\') AS notify_date, DATE_FORMAT(IFNULL(a.notify_time, u.notify_time), \'%H:%i\') AS notify_time, u.timezone 
+    FROM tasks a, projects b, users u WHERE a.id = ? AND a.pid = b.id AND b.uid = u.id AND a.state = 0 AND a.notify_date IS NOT NULL 
     UNION
-    SELECT a.id, a.content, c.name AS pname, b.uid, DATE_FORMAT(a.notify_date, \'%Y-%m-%d\') AS notify_date, DATE_FORMAT(IFNULL(a.notify_time, u.notify_time), \'%H:%i\') AS notify_time 
-    FROM tasks a, shares b, projects c, users u WHERE a.id = ? AND b.uid = u.id AND a.pid = b.pid AND b.pid = c.id AND a.state = 0 AND a.notify_date >= CURRENT_DATE`
+    SELECT a.id, a.content, c.name AS pname, b.uid, DATE_FORMAT(a.notify_date, \'%Y-%m-%d\') AS notify_date, DATE_FORMAT(IFNULL(a.notify_time, u.notify_time), \'%H:%i\') AS notify_time, u.timezone 
+    FROM tasks a, shares b, projects c, users u WHERE a.id = ? AND b.uid = u.id AND a.pid = b.pid AND b.pid = c.id AND a.state = 0 AND a.notify_date IS NOT NULL` 
   pool.promise(sql, [ id, id ]).then(results => {
     results.forEach(task => {
+      // Server Current Time (UTC+8)
       let current_time = Date.now()
-      let future_time = Date.parse(task.notify_date + ' ' + task.notify_time + ':00')
+      // Notify Time (with timezone offset)
+      let future_time = Date.parse(task.notify_date + ' ' + task.notify_time + ':00') + (-3600 * 1000 * (task.timezone - 8))
       if (future_time < current_time) {
         return
       }
@@ -324,7 +330,7 @@ function updateTimers (id) {
 }
 
 // init all timers
-let sql = `SELECT id FROM tasks WHERE state = 0 AND notify_date >= CURRENT_DATE`
+let sql = `SELECT id FROM tasks WHERE state = 0 AND notify_date IS NOT NULL`
 pool.promise(sql).then(results => {
   results.forEach(task => {
     updateTimers(task.id)

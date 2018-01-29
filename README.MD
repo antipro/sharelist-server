@@ -1,7 +1,9 @@
 # Sharelist
 
 > server-side program
-> This is a heroku version
+
+## Branch
+This is a heroku version, use sendgrid as mail sender.
 
 ## Requirement
 -------------------
@@ -13,19 +15,11 @@
 
 use ./sharelist.sql to prepare mysql database.
 
-create ./config.js, like below:
-```
-exports.config = {
-  host: 'IP',
-  user: 'username',
-  password: 'password',
-  database: 'databasename',
-  mailuser: 'mailaddress',
-  mailpwd: 'mailpassword',
-  smtpserver: 'smtpserver',
-  smtpport: smtpport
-}
-```
+prepre environment variables:
+* SENDGRID_API_KEY
+* database
+* user
+* password
 
 ## Build Setup
 

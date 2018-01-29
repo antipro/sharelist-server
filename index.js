@@ -4,9 +4,9 @@ console.log('server startup at %s', new Date())
 var setInterval = require('timers').setInterval
 var setTimeout = require('timers').setTimeout
 
-var http = require('http')
+var http2 = require('http')
 
-http.request('http://www.baidu.com', res => {
+http2.request('http://www.baidu.com', res => {
   console.log(`STATUS: ${res.statusCode}`);
   console.log(`HEADERS: ${JSON.stringify(res.headers)}`);
   res.setEncoding('utf8');

@@ -129,28 +129,19 @@ app.get('/api/verifycode', (req, res) => {
     }
     return pool.promise('INSERT INTO verifycodes(email, uuid, code, expire) VALUES(?, ?, ?, DATE_ADD(NOW(), INTERVAL 30 MINUTE))', [ req.query.email, uuid, code ])
   }).then(results => {
-    var email = require('emailjs');
-    var server = email.server.connect({
-      user: config.mailuser,
-      password: config.mailpwd,
-      host: config.smtpserver,
-      port: config.smtpport,
-      ssl: true
-    });
+    const sgMail = require('@sendgrid/mail')
+    sgMail.setApiKey(process.env.SENDGRID_API_KEY)
     let mailcontent = req.query.mailcontent
     let mailsender = req.query.mailsender
     let mailsubject = req.query.mailsubject
-    server.promise = util.promisify(server.send)
-    return server.promise({
-      text: mailcontent.replace('{code}', code),
-      from: `${mailsender} <${config.mailuser}>`,
+    const msg = {
       to: req.query.email,
+      from: `${mailsender} <${config.mailuser}>`,
       subject: mailsubject,
-      attachment:
-      [
-        { data: `<html><p>${mailcontent.replace('{code}', '<b>' + code + '</b>')}</p></html>`, alternative: true }
-      ]
-    })
+      text: mailcontent.replace('{code}', code),
+      html: `<html><p>${mailcontent.replace('{code}', '<b>' + code + '</b>')}</p></html>`,
+    };
+    return sgMail.send(msg)
   }).then(message => {
     res.send({
       state: '000',

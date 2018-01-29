@@ -62,6 +62,7 @@ CREATE TABLE IF NOT EXISTS `users` (
   `token` varchar(50) DEFAULT NULL,
   `notify_time` time NOT NULL DEFAULT '09:00:00',
   `locale` varchar(50) DEFAULT NULL,
+  `timezone` INT(2) NULL DEFAULT '0',
   `ctime` timestamp NULL DEFAULT NULL,
   PRIMARY KEY (`id`)
 ) ENGINE=InnoDB AUTO_INCREMENT=9 DEFAULT CHARSET=utf8;

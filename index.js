@@ -135,7 +135,8 @@ app.get('/api/verifycode', (req, res) => {
       password: config.mailpwd,
       host: config.smtpserver,
       port: config.smtpport,
-      ssl: true
+      ssl: true,
+      timeout: 10000
     });
     let mailcontent = req.query.mailcontent
     let mailsender = req.query.mailsender

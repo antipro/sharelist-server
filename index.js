@@ -4,20 +4,6 @@ console.log('server startup at %s', new Date())
 var setInterval = require('timers').setInterval
 var setTimeout = require('timers').setTimeout
 
-var http2 = require('http')
-
-http2.request('http://www.baidu.com', res => {
-  console.log(`STATUS: ${res.statusCode}`);
-  console.log(`HEADERS: ${JSON.stringify(res.headers)}`);
-  res.setEncoding('utf8');
-  res.on('data', (chunk) => {
-    console.log(`BODY: ${chunk}`);
-  });
-  res.on('end', () => {
-    console.log('No more data in response.');
-  });
-})
-
 // init log4js
 const log4js = require('log4js');
 log4js.configure({

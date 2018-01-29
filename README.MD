@@ -6,6 +6,7 @@
 -------------------
 * Nodejs 8.x+
 * MySQL 5.7
+* heroku
 
 ## Preparation
 

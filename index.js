@@ -87,7 +87,7 @@ app.all("*", function (req, res, next) {
  * Login
  */
 app.get('/api/login', (req, res) => {
-  pool.promise('SELECT id AS uid, email, token, name AS uname FROM users WHERE email = ? AND pwd = SHA1(?)', [req.query.email, req.query.pwd]).then((results, fields) => {
+  pool.promise('SELECT id AS uid, email, token, name AS uname, timezone FROM users WHERE email = ? AND pwd = SHA1(?)', [req.query.email, req.query.pwd]).then((results, fields) => {
     logger.debug(results)
     if (results.length === 0) {
       res.send({
@@ -176,6 +176,7 @@ app.get('/api/signup', (req, res) => {
   let pwd = req.query.pwd;
   let uuid = req.query.uuid;
   let verifycode = req.query.verifycode;
+  let timezone = req.query.timezone;
   pool.promise('SELECT 1 FROM verifycodes WHERE email = ? AND uuid = ? AND code = ?', [ email, uuid, verifycode ]).then(results => {
     if (results.length === 0) {
       res.send({
@@ -187,7 +188,7 @@ app.get('/api/signup', (req, res) => {
     return pool.promise('SELECT id, token FROM users WHERE email = ?', [ email ])
   }).then(results => {
     if (results.length === 0) {
-      return pool.promise('INSERT INTO users(email, name, pwd, token, ctime) VALUES(?, ?, SHA1(?), ?, NOW())', [email, username, pwd, uuid ]).then(results => {
+      return pool.promise('INSERT INTO users(email, name, pwd, token, timezone, ctime) VALUES(?, ?, SHA1(?), ?, ?, NOW())', [email, username, pwd, uuid, timezone ]).then(results => {
         return Promise.resolve(results.insertId)
       })
     } else {
@@ -199,13 +200,13 @@ app.get('/api/signup', (req, res) => {
         return
       } else {
         let id = results[0].id
-        return pool.promise('UPDATE users SET name = ?, pwd = SHA1(?), token = ?, ctime = NOW() WHERE id = ?', [ username, pwd, uuid, id ]).then(results => {
+        return pool.promise('UPDATE users SET name = ?, pwd = SHA1(?), token = ?, timezone = ?, ctime = NOW() WHERE id = ?', [ username, pwd, uuid, timezone, id ]).then(results => {
           return Promise.resolve(id)
         })
       }
     }
   }).then(id => {
-    return pool.promise('SELECT id AS uid, email, token, name AS uname FROM users WHERE id = ?', [ id ])
+    return pool.promise('SELECT id AS uid, email, token, name AS uname, timezone FROM users WHERE id = ?', [ id ])
   }).then(results => {
     res.send({
       state: '000',

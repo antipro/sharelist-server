@@ -1,6 +1,7 @@
 # Sharelist
 
 > server-side program
+> This is a heroku version
 
 ## Requirement
 -------------------

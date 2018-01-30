@@ -337,6 +337,15 @@ io.on('connection', (socket) => {
     return
   }
   let socketUid = socket.handshake.query.uid
+  pool.promise('SELECT 1 FROM users WHERE id = ? AND token = ?', [ socketUid, socket.handshake.query.token ]).then(results => {
+    if (results.length === 0) {
+      logger.debug('token and id is not in pair')
+      socket.emit('relogin')
+    }
+  }).catch((err) => {
+    console.error(err)
+    socket.emit('relogin')
+  })
   let socketUname = socket.handshake.query.uname
   logger.debug('user %d:%s connected', socketUid, socketUname)
   if (!sockets[socketUid]) {

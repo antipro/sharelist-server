@@ -634,6 +634,30 @@ io.on('connection', (socket) => {
   })
 
   /**
+   * reset password event
+   */
+  socket.on('resetpwd', (oldpwd, pwd) => {
+    (async () => {
+      let results = await pool.promise('SELECT 1 FROM users WHERE id = ? AND pwd = SHA1(?)', [ socketUid, oldpwd ])
+      if (results.length === 0) {
+        socket.emit('error event', 'message.pwd_error')
+        return
+      }
+      const uuidv1 = require('uuid/v1');
+      const uuid = uuidv1();
+      await pool.promise('UPDATE users SET pwd = SHA1(?), token = ? WHERE id = ?', [ pwd, uuid, socketUid ])
+      if (sockets[socketUid]) {
+        sockets[socketUid].forEach(s => {
+          s.emit('pwd reseted')
+        })
+      }
+    })().catch(err => {
+      console.error(err)
+      socket.emit('error event', 'message.update_error')
+    })
+  })
+
+  /**
    * disconnection event
    */
   socket.on('disconnect', () => {

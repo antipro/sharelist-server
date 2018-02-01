@@ -43,7 +43,7 @@ CREATE TABLE IF NOT EXISTS `shares` (
 CREATE TABLE IF NOT EXISTS `tasks` (
   `id` int(11) NOT NULL AUTO_INCREMENT,
   `uid` int(11) NOT NULL,
-  `content` varchar(255) NOT NULL DEFAULT '',
+  `content` varchar(500) NOT NULL DEFAULT '',
   `pid` int(11) NOT NULL,
   `state` tinyint(2) NOT NULL DEFAULT '0',
   `ctime` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,

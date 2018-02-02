@@ -404,7 +404,7 @@ io.on('connection', (socket) => {
       SELECT a.id, a.uid, u.name AS uname, a.name, DATE_FORMAT(a.ctime, \'%Y-%m-%d %H:%i:%s\') AS ctime, \'\' AS editable, b.control 
       FROM projects a, shares b, users u WHERE b.uid = ${socketUid} AND a.id = b.pid AND a.state = 0 AND a.uid = u.id`
   let sql3 = `SELECT DATE_FORMAT(notify_time, \'%H:%i\') AS notify_time, locale FROM users WHERE id = ${socketUid}`
-  let callback = (results) => {
+  let postProcess = (results) => {
     let tasks = results[0]
     let projects = results[1]
     let preference = results[2][0]
@@ -417,7 +417,7 @@ io.on('connection', (socket) => {
       preference
     })
   }
-  pool.promise(sql1 + ';' + sql2 + ';' + sql3).then(callback).catch((err) => {
+  pool.promise(sql1 + ';' + sql2 + ';' + sql3).then(postProcess).catch((err) => {
     console.error(err)
     socket.emit('error event', 'message.query_error')
   })
@@ -425,10 +425,10 @@ io.on('connection', (socket) => {
   /**
    * all data event
    */
-  socket.on('refresh', (fn) => {
+  socket.on('refresh', (callback) => {
     pool.promise(sql1 + ';' + sql2 + ';' + sql3).then((results) => {
-      callback(results)
-      fn()
+      postProcess(results)
+      callback()
     }).catch((err) => {
       console.error(err)
       socket.emit('error event', 'message.query_error')
@@ -636,7 +636,7 @@ io.on('connection', (socket) => {
   /**
    * update task event
    */
-  socket.on('updatetask', ({ id, pid, content, notify_date, notify_time }) => {
+  socket.on('updatetask', ({ id, pid, content, notify_date, notify_time }, callback) => {
     (async () => {
       if (notify_date === '') {
         notify_date = null
@@ -646,6 +646,9 @@ io.on('connection', (socket) => {
       }
       let result = await pool.promise('UPDATE tasks SET content = ?, notify_date = ?, notify_time = ? WHERE id = ?', [content, notify_date, notify_time, id])
       if (result.affectedRows > 0) {
+        if (callback) {
+          callback()
+        }
         let results = await pool.promise(`SELECT a.id, a.uid, a.content, IFNULL(b.name, '') AS pname, a.pid, a.state, DATE_FORMAT(a.ctime, \'%Y-%m-%d %H:%i:%s\') AS ctime, 
           DATE_FORMAT(a.notify_date, \'%Y-%m-%d\') AS notify_date, DATE_FORMAT(a.notify_time, \'%H:%i\') AS notify_time 
           FROM tasks a LEFT JOIN projects b ON a.pid = b.id WHERE a.id = ?`, id)

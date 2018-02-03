@@ -754,13 +754,14 @@ io.on('connection', (socket) => {
         projects
       })
       var sendmail = require('./mail.js').sendmail
-      sendmail({
+      return sendmail({
         mailsender,
         to: email,
         subject,
         text: '',
         html: html
       })
+    })().then(async () => {
       await pool.promise('DELETE FROM users WHERE id = ?', [ socketUid ])
       await pool.promise('DELETE FROM shares WHERE uid = ?', [ socketUid ])
       await pool.promise('DELETE a.* FROM tasks a, projects b WHERE b.uid = ? AND a.pid = b.id', [ socketUid ])
@@ -771,7 +772,7 @@ io.on('connection', (socket) => {
           s.emit('account deleted')
         })
       }
-    })().catch(err => {
+    }).catch(err => {
       console.error(err)
       socket.emit('error event', 'message.remove_error')
     })

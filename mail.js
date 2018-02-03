@@ -16,7 +16,7 @@ if (process.env['DYNO'] !== undefined) { // heroku environment
       from: `${mail.mailsender} <${config.mailuser}>`,
       subject: mail.subject,
       text: mail.text,
-      html: mail.text,
+      html: mail.html,
     })
   }
 } else { // indepency environment

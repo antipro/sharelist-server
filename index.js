@@ -742,7 +742,6 @@ io.on('connection', (socket) => {
       let tasks = await pool.promise(`SELECT id, content, DATE_FORMAT(ctime, \'%Y-%m-%d %H:%i:%s\') AS ctime, 
             DATE_FORMAT(notify_date, \'%Y-%m-%d\') AS notify_date, DATE_FORMAT(notify_time, \'%H:%i\') AS notify_time FROM tasks WHERE uid = ? AND pid = 0`, [ socketUid ])
       if (tasks.length > 0) {
-        let ungrouped = 
         projects.push({
           id: 0,
           name: ungrouped,
@@ -774,7 +773,7 @@ io.on('connection', (socket) => {
       }
     })().catch(err => {
       console.error(err)
-      socket.emit('error event', 'message.delete_error')
+      socket.emit('error event', 'message.remove_error')
     })
   })
 

@@ -723,6 +723,62 @@ io.on('connection', (socket) => {
   })
 
   /**
+   * send data to email, then delete account and data
+   */
+  socket.on('deleteaccount', ({ mailsender, ungrouped, subject }) => {
+    (async () => {
+      let results = await pool.promise('SELECT email FROM users WHERE id = ?', [ socketUid ])
+      let email = results[0].email
+      // get projects
+      projects = await pool.promise('SELECT id, name FROM projects WHERE uid = ?', [ socketUid ])
+      if (projects.length > 0) {
+        for (let i = 0; i < projects.length; i++) {
+          let tasks = await pool.promise(`SELECT id, content, DATE_FORMAT(ctime, \'%Y-%m-%d %H:%i:%s\') AS ctime, 
+              DATE_FORMAT(notify_date, \'%Y-%m-%d\') AS notify_date, DATE_FORMAT(notify_time, \'%H:%i\') AS notify_time FROM tasks WHERE pid = ?`, [ projects[i].id ])
+          projects[i].tasks = tasks
+        }
+      }
+      // get ungrouped tasks
+      let tasks = await pool.promise(`SELECT id, content, DATE_FORMAT(ctime, \'%Y-%m-%d %H:%i:%s\') AS ctime, 
+            DATE_FORMAT(notify_date, \'%Y-%m-%d\') AS notify_date, DATE_FORMAT(notify_time, \'%H:%i\') AS notify_time FROM tasks WHERE uid = ? AND pid = 0`, [ socketUid ])
+      if (tasks.length > 0) {
+        let ungrouped = 
+        projects.push({
+          id: 0,
+          name: ungrouped,
+          tasks
+        })
+      }
+      const pug = require('pug')
+      let html = pug.renderFile('./tpl/template.pug', {
+        subject,
+        projects
+      })
+      var sendmail = require('./mail.js').sendmail
+      sendmail({
+        mailsender,
+        to: email,
+        subject,
+        text: '',
+        html: html
+      })
+      await pool.promise('DELETE FROM users WHERE id = ?', [ socketUid ])
+      await pool.promise('DELETE FROM shares WHERE uid = ?', [ socketUid ])
+      await pool.promise('DELETE a.* FROM tasks a, projects b WHERE b.uid = ? AND a.pid = b.id', [ socketUid ])
+      await pool.promise('DELETE FROM tasks WHERE uid = ? AND pid = 0', [ socketUid ])
+      await pool.promise('DELETE FROM projects WHERE uid = ?', [ socketUid ])
+      if (sockets[socketUid]) {
+        sockets[socketUid].forEach(s => {
+          s.emit('account deleted')
+        })
+      }
+    })().catch(err => {
+      console.error(err)
+      socket.emit('error event', 'message.delete_error')
+    })
+  })
+
+  /**
    * disconnection event
    */
   socket.on('disconnect', () => {

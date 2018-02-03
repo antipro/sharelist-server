@@ -1,0 +1,10 @@
+//- template.pug
+html
+  p= subject
+  dl
+    each project in projects
+      dt= project.name
+      dd
+        ul
+          each task in project.tasks
+            li= task.content

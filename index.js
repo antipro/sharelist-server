@@ -50,22 +50,31 @@ app.all("*", function (req, res, next) {
  * Login
  */
 app.get('/api/login', (req, res) => {
-  pool.promise('SELECT id AS uid, email, token, name AS uname, timezone FROM users WHERE email = ? AND pwd = SHA1(?)', [req.query.email, req.query.pwd]).then((results, fields) => {
-    logger.debug(results)
+  (async () => {
+    let results = await pool.promise('SELECT 1 FROM users WHERE email = ?', [ req.query.email ])
     if (results.length === 0) {
       res.send({
         state: '001',
         msg: 'message.user_not_existed'
       })
-      return Promise.reject('user_not_existed')
+      return
     }
+    results = await pool.promise('SELECT id AS uid, email, token, name AS uname, timezone FROM users WHERE email = ? AND pwd = SHA1(?)', [ req.query.email, req.query.pwd ])
+    if (results.length === 0) {
+      res.send({
+        state: '001',
+        msg: 'message.password_is_not_right'
+      })
+      return
+    }
+    logger.debug('login: ', results[0])
     res.send({
       state: '000',
       msg: '',
       data: results[0]
     })
-  }).catch((err) => {
-    logger.debug(err)
+  })().catch(err => {
+    logger.error(err)
     res.send({
       state: '001',
       msg: 'message.login_error'

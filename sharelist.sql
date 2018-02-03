@@ -64,7 +64,8 @@ CREATE TABLE IF NOT EXISTS `users` (
   `locale` varchar(50) DEFAULT NULL,
   `timezone` INT(2) NULL DEFAULT '0',
   `ctime` timestamp NULL DEFAULT NULL,
-  PRIMARY KEY (`id`)
+  PRIMARY KEY (`id`),
+  UNIQUE INDEX `email` (`email`)
 ) ENGINE=InnoDB AUTO_INCREMENT=9 DEFAULT CHARSET=utf8;
 
 -- Data exporting was unselected.

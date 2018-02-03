@@ -758,7 +758,7 @@ io.on('connection', (socket) => {
         mailsender,
         to: email,
         subject,
-        text: '',
+        text: ' ',
         html: html
       })
     })().then(async () => {

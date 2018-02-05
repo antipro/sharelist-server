@@ -1,4 +1,4 @@
-import { setInterval } from 'timers';
+var setInterval = require('timers').setInterval
 
 /**
  * baidu speech recognition token
@@ -15,10 +15,8 @@ if (process.env['DYNO'] !== undefined) { // heroku environment
     console.log('Please create config.js file.')
     console.log('Content like this:')
     console.log(`exports.config = {
-      host: 'host',
-      user: 'user',
-      password: 'password',
-      database: 'database'
+      apiKey: 'apiKey',
+      secretKey: 'secretKey'
     }`)
     process.exit(-1)
   }

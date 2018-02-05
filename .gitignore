@@ -11,6 +11,6 @@ npm-debug.log*
 *.sln
 nohup.out
 
-logs/*
+logs/*.log
 config.js
 .env

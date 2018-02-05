@@ -21,6 +21,21 @@ var app = require('express')()
 var http = require('http').Server(app)
 var io = require('socket.io')(http, { origins: '*:*' })
 
+
+
+const https = require('https')
+https.get('https://openapi.baidu.com/oauth/2.0/token?grant_type=client_credentials&client_id=oG4bBjiXN8sLz8t4Ail8pBIP&client_secret=11c924ab42dff71b4b7cedadeb6c209b&', (resp) => {
+  let data = ''
+  resp.on('data', (chunk) => {
+    data += chunk
+  })
+  resp.on('end', () => {
+    console.log(data)
+  })
+}).on('error', (err) => {
+  console.log('Error: ' + err.message)
+})
+
 // init connnection pool of database
 var pool = require('./database.js')
 

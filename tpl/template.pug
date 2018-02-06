@@ -1,10 +1,32 @@
 //- template.pug
-html
+doctype html
+html(lang="en")
+  head
+    style(type='text/css').
+      table, tr, th, td {
+        border: 1px solid black; border-collapse: collapse;
+      }
   p= subject
-  dl
-    each project in projects
-      dt= project.name
-      dd
-        ul
-          each task in project.tasks
-            li= task.content
+  table
+    tr
+      th= 'ID'
+      th= 'PROJECT'
+      th= 'STATUS'
+      th= 'CONTENT'
+      th= 'CTIME'
+      th= 'NOTIFY_DATE'
+      th= 'NOTIFY_TIME'
+    each task in tasks
+      tr
+        td= task.id
+        td= task.pname
+        if task.status == 1
+          td!= '&#10003;'
+        else if task.status == 2
+          td!= '&#10007;'
+        else
+          td!= '&nbsp;'
+        td= task.content
+        td= task.ctime
+        td= task.notify_date
+        td= task.notify_time

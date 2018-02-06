@@ -740,28 +740,16 @@ io.on('connection', (socket) => {
       let results = await pool.promise('SELECT email FROM users WHERE id = ?', [ socketUid ])
       let email = results[0].email
       // get projects
-      projects = await pool.promise('SELECT id, name FROM projects WHERE uid = ?', [ socketUid ])
-      if (projects.length > 0) {
-        for (let i = 0; i < projects.length; i++) {
-          let tasks = await pool.promise(`SELECT id, content, DATE_FORMAT(ctime, \'%Y-%m-%d %H:%i:%s\') AS ctime, 
-              DATE_FORMAT(notify_date, \'%Y-%m-%d\') AS notify_date, DATE_FORMAT(notify_time, \'%H:%i\') AS notify_time FROM tasks WHERE pid = ?`, [ projects[i].id ])
-          projects[i].tasks = tasks
-        }
-      }
+      let tasks = await pool.promise(`SELECT a.id, a.content, DATE_FORMAT(a.ctime, \'%Y-%m-%d %H:%i:%s\') AS ctime, 
+          DATE_FORMAT(a.notify_date, \'%Y-%m-%d\') AS notify_date, DATE_FORMAT(a.notify_time, \'%H:%i\') AS notify_time, 
+          b.name AS pname FROM tasks a 
+          LEFT JOIN projects b ON a.pid = b.id 
+          WHERE b.uid = ? OR (a.pid = 0 AND a.uid = ?) ORDER BY a.pid, a.id`, [ socketUid, socketUid ])
       // get ungrouped tasks
-      let tasks = await pool.promise(`SELECT id, content, DATE_FORMAT(ctime, \'%Y-%m-%d %H:%i:%s\') AS ctime, 
-            DATE_FORMAT(notify_date, \'%Y-%m-%d\') AS notify_date, DATE_FORMAT(notify_time, \'%H:%i\') AS notify_time FROM tasks WHERE uid = ? AND pid = 0`, [ socketUid ])
-      if (tasks.length > 0) {
-        projects.push({
-          id: 0,
-          name: ungrouped,
-          tasks
-        })
-      }
       const pug = require('pug')
       let html = pug.renderFile('./tpl/template.pug', {
         subject,
-        projects
+        tasks
       })
       var sendmail = require('./mail.js').sendmail
       return sendmail({

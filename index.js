@@ -256,26 +256,6 @@ app.get('/api/findpwd', (req, res) => {
 })
 
 /**
- * Shared users of project
- */
-app.get('/api/shares/:pid', (req, res) => {
-  pool.promise('SELECT b.id AS uid, b.email, name AS uname FROM shares a, users b WHERE a.pid = ? AND a.uid = b.id', [ req.params.pid ]).then((results, fields) => {
-    logger.debug(results)
-    res.send({
-      state: '000',
-      msg: '',
-      data: results
-    })
-  }).catch((err) => {
-    console.error(err)
-    res.send({
-      state: '001',
-      msg: 'message.query_error'
-    })
-  })
-})
-
-/**
  * Project info and tasks
  */
 app.get('/api/projects/:pid', (req, res) => {
@@ -448,7 +428,7 @@ io.on('connection', (socket) => {
   /**
    * add project event
    */
-  socket.on('addproject', ({ name }) => {
+  socket.on('addproject', ({ name }, callback) => {
     (async () => {
       let result = await pool.promise('INSERT INTO projects SET ?', { uid: socketUid, name })
       let pid = result.insertId
@@ -458,6 +438,9 @@ io.on('connection', (socket) => {
       let results = await pool.promise(`SELECT id AS id, uid, name, DATE_FORMAT(ctime, \'%Y-%m-%d %H:%i:%s\') AS ctime, editable, \'\' AS control 
         FROM projects WHERE id = ?`, pid)
       let project = results[0]
+      if (callback) {
+        callback(project)
+      }
       sockets[socketUid].forEach(s => {
         s.emit('project added', project)
       })
@@ -470,7 +453,7 @@ io.on('connection', (socket) => {
   /**
    * add task event
    */
-  socket.on('addtask', ({ pid, content, notify_date }) => {
+  socket.on('addtask', ({ pid, content, notify_date }, callback) => {
     (async () => {
       let result = await pool.promise('INSERT INTO tasks SET ?', { uid: socketUid, pid, content, notify_date })
       let id = result.insertId
@@ -480,6 +463,9 @@ io.on('connection', (socket) => {
         DATE_FORMAT(a.notify_date, \'%Y-%m-%d\') AS notify_date, DATE_FORMAT(a.notify_time, \'%H:%i\') AS notify_time 
         FROM tasks a LEFT JOIN projects b ON a.pid = b.id WHERE a.id = ?`, id)
       let task = results[0]
+      if (callback) {
+        callback(task)
+      }
       if (pid === 0) { // task wihtout project is private
         sockets[socketUid].forEach(s => {
           s.emit('task added', task)
@@ -572,7 +558,7 @@ io.on('connection', (socket) => {
   /**
    * update project event
    */
-  socket.on('updateproject', ({ pid, pname, shares }) => {
+  socket.on('updateproject', ({ pid, pname, shares, mailsender, share_subject, share_description }) => {
     (async () => {
       let result = await pool.promise('UPDATE projects SET name = ? WHERE id = ?', [ pname, pid ])
       if (result.affectedRows > 0) {
@@ -588,7 +574,7 @@ io.on('connection', (socket) => {
         })
       }
       
-      console.debug('unshared project event')
+      console.log('unshared project event')
       let results = await pool.promise('SELECT uid FROM shares WHERE pid = ?', [ pid ])
       const old_uids = results.map(row => row.uid)
       const new_uids = shares.map(share => share.uid)
@@ -605,25 +591,47 @@ io.on('connection', (socket) => {
         }
       })
 
-      console.debug('add new user if not existed')
-      for (let idx = 0; idx < shares.length; idx++) {
-        const share = shares[idx];
+      console.log('add new user if not existed')
+      for (let share of shares) {
         if (share.uid === 0) {
-          results = await pool.promise('SELECT id FROM users WHERE email = ?', [ share.email ])
+          results = await pool.promise('SELECT id, ctime FROM users WHERE email = ?', [ share.email ])
           if (results.length === 0) {
             result = await pool.promise('INSERT INTO users SET ?', { email: share.email })
             share.uid = result.insertId
+            share.registed = false
           } else {
             share.uid = results[0].id
+            if (results[0].ctime === null) {
+              share.registed = false
+            } else {
+              share.registed = true
+            }
           }
         }
       }
 
-      console.debug('add new share relationship %s and share project event', shares)
+      console.log('add new share relationship %s and share project event', shares)
       for (let share of shares) {
         results = await pool.promise('SELECT 1 FROM shares WHERE pid = ? AND uid = ?', [pid, share.uid])
         if (results.length === 0) {
           await pool.promise('INSERT INTO shares SET ?', { pid, uid: share.uid })
+          if (share.registed === false) { // user not registed
+            const pug = require('pug')
+            let html = pug.renderFile('./tpl/projectshared.pug', {
+              mailsender,
+              description: share_description
+            })
+            var sendmail = require('./mail.js').sendmail
+            sendmail({
+              mailsender,
+              to: share.email,
+              subject: share_subject,
+              text: ' ',
+              html: html
+            }).catch(err => {
+              console.error('sharing email failed', err)
+            })
+          }
         }
         if (sockets[share.uid]) {
           sockets[share.uid].forEach(s => {
@@ -632,7 +640,7 @@ io.on('connection', (socket) => {
         }
       }
 
-      console.debug('update timer')
+      console.log('update timer')
       results = await pool.promise('SELECT id FROM tasks WHERE pid = ?', [ pid ])
       results.forEach(task => {
         updateTimers(task.id)
@@ -676,6 +684,19 @@ io.on('connection', (socket) => {
     })().catch(err => {
       console.error(err)
       socket.emit('error event', 'message.update_error')
+    })
+  })
+
+  /**
+   * Shared users of project
+   */
+  socket.on('querysharedusers', (pid, callback) => {
+    (async () => {
+      let results = await pool.promise('SELECT b.id AS uid, b.email, name AS uname FROM shares a, users b WHERE a.pid = ? AND a.uid = b.id', [ pid ])
+      callback(results)
+    })().catch(err => {
+      console.error(err)
+      socket.emit('error event', 'message.query_error')
     })
   })
 
@@ -745,9 +766,8 @@ io.on('connection', (socket) => {
           b.name AS pname FROM tasks a 
           LEFT JOIN projects b ON a.pid = b.id 
           WHERE b.uid = ? OR (a.pid = 0 AND a.uid = ?) ORDER BY a.pid, a.id`, [ socketUid, socketUid ])
-      // get ungrouped tasks
       const pug = require('pug')
-      let html = pug.renderFile('./tpl/template.pug', {
+      let html = pug.renderFile('./tpl/accountdeleted.pug', {
         subject,
         tasks
       })

@@ -317,11 +317,14 @@ function updateTimers (id) {
     results.forEach(task => {
       // Server Current Time (UTC+8)
       let current_time = Date.now()
+      console.log(current_time)
       // Notify Time (with timezone offset)
       let future_time = Date.parse(task.notify_date + ' ' + task.notify_time + ':00') + (-3600 * 1000 * (task.timezone - 8))
+      console.log(id, task.notify_date + ' ' + task.notify_time + ':00', future_time)
       if (future_time < current_time) {
         return
       }
+      console.log(future_time - current_time)
       let timer = setTimeout(() => {
         if (sockets[task.uid]) {
           logger.debug('push task #%d to user #%d', task.id, task.uid)

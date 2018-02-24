@@ -344,15 +344,19 @@ function updateTimers (id) {
 }
 
 // init all timers
-let sql = `SELECT id FROM tasks WHERE state = 0 AND notify_date IS NOT NULL`
-pool.promise(sql).then(results => {
-  results.forEach(task => {
-    updateTimers(task.id)
+function scheduleTimers () {
+  let sql = `SELECT id FROM tasks WHERE state = 0 AND notify_date IS NOT NULL`
+  pool.promise(sql).then(results => {
+    results.forEach(task => {
+      updateTimers(task.id)
+    })
+  }).catch((err) => {
+    console.error(err)
+    socket.emit('error event', 'message.query_error')
   })
-}).catch((err) => {
-  console.error(err)
-  socket.emit('error event', 'message.query_error')
-})
+}
+scheduleTimers()
+setInterval(scheduleTimers, 24 * 3600 * 1000)
 
 /**
  * socket connection event

@@ -63,7 +63,7 @@ module.exports = function (http, pool, sendmail, logger, fetchToken) {
       })
       logger.debug(timers)
     }).catch((err) => {
-      console.error(err)
+      logger.error(err)
       socket.emit('error event', 'message.query_error')
     })
   }
@@ -76,7 +76,7 @@ module.exports = function (http, pool, sendmail, logger, fetchToken) {
         updateTimers(task.id)
       })
     }).catch((err) => {
-      console.error(err)
+      logger.error(err)
       socket.emit('error event', 'message.query_error')
     })
   }
@@ -101,7 +101,7 @@ module.exports = function (http, pool, sendmail, logger, fetchToken) {
         socket.emit('relogin')
       }
     }).catch((err) => {
-      console.error(err)
+      logger.error(err)
       socket.emit('relogin')
     })
     let socketUname = socket.handshake.query.uname
@@ -143,7 +143,7 @@ module.exports = function (http, pool, sendmail, logger, fetchToken) {
       })
     }
     pool.promise(sql1 + ';' + sql2 + ';' + sql3).then(postProcess).catch((err) => {
-      console.error(err)
+      logger.error(err)
       socket.emit('error event', 'message.query_error')
     })
   
@@ -155,7 +155,7 @@ module.exports = function (http, pool, sendmail, logger, fetchToken) {
         postProcess(results)
         callback()
       }).catch((err) => {
-        console.error(err)
+        logger.error(err)
         socket.emit('error event', 'message.query_error')
       })
     })
@@ -180,7 +180,7 @@ module.exports = function (http, pool, sendmail, logger, fetchToken) {
           s.emit('project added', project)
         })
       })().catch((err) => {
-        console.error(err)
+        logger.error(err)
         socket.emit('error event', 'message.add_error')
       })
     })
@@ -209,7 +209,7 @@ module.exports = function (http, pool, sendmail, logger, fetchToken) {
           socket.emit('task added', task).to('project ' + pid).emit('task added', task, { uid: socketUid, uname: socketUname })
         }
       })().catch((err) => {
-        console.error(err)
+        logger.error(err)
         socket.emit('error event', 'message.add_error')
       })
     })
@@ -239,7 +239,7 @@ module.exports = function (http, pool, sendmail, logger, fetchToken) {
           updateTimers(task.id)
         })
       })().catch((err) => {
-        console.error(err)
+        logger.error(err)
         socket.emit('error event', 'message.remove_error')
       })
     })
@@ -261,7 +261,7 @@ module.exports = function (http, pool, sendmail, logger, fetchToken) {
           updateTimers(id)
         }
       })().catch((err) => {
-        console.error(err)
+        logger.error(err)
         socket.emit('error event', 'message.remove_error')
       })
     })
@@ -285,7 +285,7 @@ module.exports = function (http, pool, sendmail, logger, fetchToken) {
         }
         updateTimers(id)
       })().catch((err) => {
-        console.error(err)
+        logger.error(err)
         socket.emit('error event', 'message.update_error')
       })
     })
@@ -309,7 +309,7 @@ module.exports = function (http, pool, sendmail, logger, fetchToken) {
           })
         }
         
-        console.log('unshared project event')
+        logger.log('unshared project event')
         let results = await pool.promise('SELECT uid FROM shares WHERE pid = ?', [ pid ])
         const old_uids = results.map(row => row.uid)
         const new_uids = shares.map(share => share.uid)
@@ -326,7 +326,7 @@ module.exports = function (http, pool, sendmail, logger, fetchToken) {
           }
         })
   
-        console.log('add new user if not existed')
+        logger.log('add new user if not existed')
         for (let share of shares) {
           if (share.uid === 0) {
             results = await pool.promise('SELECT id, ctime FROM users WHERE email = ?', [ share.email ])
@@ -345,7 +345,7 @@ module.exports = function (http, pool, sendmail, logger, fetchToken) {
           }
         }
   
-        console.log('add new share relationship %s and share project event', shares)
+        logger.log('add new share relationship %s and share project event', shares)
         for (let share of shares) {
           results = await pool.promise('SELECT 1 FROM shares WHERE pid = ? AND uid = ?', [pid, share.uid])
           if (results.length === 0) {
@@ -363,7 +363,7 @@ module.exports = function (http, pool, sendmail, logger, fetchToken) {
                 text: ' ',
                 html: html
               }).catch(err => {
-                console.error('sharing email failed', err)
+                logger.error('sharing email failed', err)
               })
             }
           }
@@ -374,13 +374,13 @@ module.exports = function (http, pool, sendmail, logger, fetchToken) {
           }
         }
   
-        console.log('update timer')
+        logger.log('update timer')
         results = await pool.promise('SELECT id FROM tasks WHERE pid = ?', [ pid ])
         results.forEach(task => {
           updateTimers(task.id)
         })
       })().catch(err => {
-        console.error(err)
+        logger.error(err)
         socket.emit('error event', 'message.update_error')
       })
     })
@@ -416,7 +416,7 @@ module.exports = function (http, pool, sendmail, logger, fetchToken) {
           updateTimers(id)
         }
       })().catch(err => {
-        console.error(err)
+        logger.error(err)
         socket.emit('error event', 'message.update_error')
       })
     })
@@ -429,7 +429,7 @@ module.exports = function (http, pool, sendmail, logger, fetchToken) {
         let results = await pool.promise('SELECT b.id AS uid, b.email, name AS uname FROM shares a, users b WHERE a.pid = ? AND a.uid = b.id', [ pid ])
         callback(results)
       })().catch(err => {
-        console.error(err)
+        logger.error(err)
         socket.emit('error event', 'message.query_error')
       })
     })
@@ -458,7 +458,7 @@ module.exports = function (http, pool, sendmail, logger, fetchToken) {
           updateTimers(task.id)
         })
       })().catch(err => {
-        console.error(err)
+        logger.error(err)
         socket.emit('error event', 'message.update_error')
       })
     })
@@ -482,7 +482,7 @@ module.exports = function (http, pool, sendmail, logger, fetchToken) {
           })
         }
       })().catch(err => {
-        console.error(err)
+        logger.error(err)
         socket.emit('error event', 'message.update_error')
       })
     })
@@ -524,7 +524,7 @@ module.exports = function (http, pool, sendmail, logger, fetchToken) {
           })
         }
       }).catch(err => {
-        console.error(err)
+        logger.error(err)
         socket.emit('error event', 'message.remove_error')
       })
     })

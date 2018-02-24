@@ -228,7 +228,7 @@ module.exports = function (pool, sendmail, logger) {
         msg: ''
       })
     }).catch((err) => {
-      console.error(err)
+      logger.error(err)
       res.send({
         state: '001',
         msg: 'message.update_error'
@@ -257,7 +257,7 @@ module.exports = function (pool, sendmail, logger) {
         }
       })
     }).catch(err => {
-      console.error(err)
+      logger.error(err)
       res.send({
         state: '001',
         msg: 'message.query_error'

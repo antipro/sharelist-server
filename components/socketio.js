@@ -352,7 +352,7 @@ module.exports = function (http, pool, sendmail, logger, fetchToken) {
             await pool.promise('INSERT INTO shares SET ?', { pid, uid: share.uid })
             if (share.registed === false) { // user not registed
               const pug = require('pug')
-              let html = pug.renderFile('../tpl/projectshared.pug', {
+              let html = pug.renderFile('tpl/projectshared.pug', {
                 mailsender,
                 description: share_description
               })
@@ -503,7 +503,7 @@ module.exports = function (http, pool, sendmail, logger, fetchToken) {
             WHERE b.uid = ? OR (a.pid = 0 AND a.uid = ?) ORDER BY a.pid, a.state, a.id`, [ socketUid, socketUid ])
         const pug = require('pug')
         const i18n = require('./locale')
-        let html = pug.renderFile('../tpl/accountdeleted.pug', {
+        let html = pug.renderFile('tpl/accountdeleted.pug', {
           subject,
           tasks,
           locale,

@@ -352,7 +352,7 @@ module.exports = function (http, pool, sendmail, logger, fetchToken) {
             await pool.promise('INSERT INTO shares SET ?', { pid, uid: share.uid })
             if (share.registed === false) { // user not registed
               const pug = require('pug')
-              let html = pug.renderFile('./tpl/projectshared.pug', {
+              let html = pug.renderFile('../tpl/projectshared.pug', {
                 mailsender,
                 description: share_description
               })
@@ -489,21 +489,25 @@ module.exports = function (http, pool, sendmail, logger, fetchToken) {
   
     /**
      * send data to email, then delete account and data
+     * @event deleteaccount
      */
     socket.on('deleteaccount', ({ mailsender, ungrouped, subject }) => {
       (async () => {
-        let results = await pool.promise('SELECT email FROM users WHERE id = ?', [ socketUid ])
-        let email = results[0].email
+        let results = await pool.promise('SELECT email, locale FROM users WHERE id = ?', [ socketUid ])
+        let { email, locale } = results[0]
         // get projects
-        let tasks = await pool.promise(`SELECT a.id, a.content, DATE_FORMAT(a.ctime, \'%Y-%m-%d %H:%i:%s\') AS ctime, 
+        let tasks = await pool.promise(`SELECT a.id, a.state, a.content, DATE_FORMAT(a.ctime, \'%Y-%m-%d %H:%i:%s\') AS ctime, 
             DATE_FORMAT(a.notify_date, \'%Y-%m-%d\') AS notify_date, DATE_FORMAT(a.notify_time, \'%H:%i\') AS notify_time, 
             b.name AS pname FROM tasks a 
             LEFT JOIN projects b ON a.pid = b.id 
-            WHERE b.uid = ? OR (a.pid = 0 AND a.uid = ?) ORDER BY a.pid, a.id`, [ socketUid, socketUid ])
+            WHERE b.uid = ? OR (a.pid = 0 AND a.uid = ?) ORDER BY a.pid, a.state, a.id`, [ socketUid, socketUid ])
         const pug = require('pug')
-        let html = pug.renderFile('./tpl/accountdeleted.pug', {
+        const i18n = require('./locale')
+        let html = pug.renderFile('../tpl/accountdeleted.pug', {
           subject,
-          tasks
+          tasks,
+          locale,
+          i18n
         })
         return sendmail({
           mailsender,

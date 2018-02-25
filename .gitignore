@@ -13,4 +13,5 @@ nohup.out
 
 logs/*.log
 config.js
-.env
+
+test/*.html

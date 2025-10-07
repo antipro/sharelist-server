@@ -64,7 +64,6 @@ module.exports = function (http, pool, sendmail, logger, fetchToken) {
       logger.debug(timers)
     }).catch((err) => {
       logger.error(err)
-      socket.emit('error event', 'message.query_error')
     })
   }
 
@@ -77,7 +76,6 @@ module.exports = function (http, pool, sendmail, logger, fetchToken) {
       })
     }).catch((err) => {
       logger.error(err)
-      socket.emit('error event', 'message.query_error')
     })
   }
   scheduleTimers()

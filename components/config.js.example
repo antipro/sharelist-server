@@ -1,0 +1,21 @@
+/**
+ * Configuration file for non-Heroku environments
+ * Copy this file to config.js and update with your actual values
+ */
+exports.config = {
+  // Database configuration
+  host: 'localhost',
+  user: 'your_db_user',
+  password: 'your_db_password',
+  database: 'sharelist',
+  
+  // Mail configuration
+  mailuser: 'your_email@example.com',
+  mailpwd: 'your_email_password',
+  smtpserver: 'smtp.example.com',
+  smtpport: 465,
+  
+  // Baidu API configuration (for speech recognition)
+  apiKey: 'your_baidu_api_key',
+  secretKey: 'your_baidu_secret_key'
+}

@@ -16,9 +16,8 @@ const timers = new Object()
  * @param {Pool} pool 
  * @param {Function} sendmail 
  * @param {Logger} logger 
- * @param {Function} fetchToken 
  */
-module.exports = function (http, pool, sendmail, logger, fetchToken) {
+module.exports = function (http, pool, sendmail, logger) {
 
   /**
    * update all timers of some task
@@ -529,10 +528,6 @@ module.exports = function (http, pool, sendmail, logger, fetchToken) {
         logger.error(err)
         socket.emit('error event', 'message.remove_error')
       })
-    })
-  
-    socket.on('fetchtoken', (callback) => {
-      callback(fetchToken())
     })
   
     /**

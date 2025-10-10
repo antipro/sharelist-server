@@ -57,7 +57,7 @@ module.exports = function (pool, sendmail, logger) {
         data: results[0]
       })
     })().catch(err => {
-      logger.error("code: ", err.code, "message: ", err.sqlMessage)
+      logger.error("code: ", err.code, "message: ", err.sqlMessage || err.message)
       res.send({
         state: '001',
         msg: 'message.login_error'
@@ -85,7 +85,7 @@ module.exports = function (pool, sendmail, logger) {
       }
     }).catch((err) => {
       if (err instanceof Error) {
-        logger.error("code: ", err.code, "message: ", err.sqlMessage)
+        logger.error("code: ", err.code, "message: ", err.sqlMessage || err.message)
         res.send({
           state: '001',
           msg: 'message.query_error'
@@ -113,6 +113,7 @@ module.exports = function (pool, sendmail, logger) {
         text: mailcontent.replace('{code}', code),
         html: `<html><p>${mailcontent.replace('{code}', '<b>' + code + '</b>')}</p></html>`
       })
+      // return Promise.resolve({})
     }).then(message => {
       res.send({
         state: '000',
@@ -122,7 +123,7 @@ module.exports = function (pool, sendmail, logger) {
         }
       })
     }).catch((err) => {
-      logger.error("code: ", err.code, "message: ", err.sqlMessage)
+      logger.error("code: ", err.code, "message: ", err.message)
       if (err instanceof Error) {
         res.send({
           state: '001',
@@ -179,7 +180,7 @@ module.exports = function (pool, sendmail, logger) {
         data: results[0]
       })
     }).catch((err) => {
-      logger.error("code: ", err.code, "message: ", err.sqlMessage)
+      logger.error("code: ", err.code, "message: ", err.sqlMessage || err.message)
       if (err instanceof Error) {
         res.send({
           state: '001',
@@ -228,7 +229,7 @@ module.exports = function (pool, sendmail, logger) {
         msg: ''
       })
     }).catch((err) => {
-      logger.error("code: ", err.code, "message: ", err.sqlMessage)
+      logger.error("code: ", err.code, "message: ", err.sqlMessage || err.message)
       res.send({
         state: '001',
         msg: 'message.update_error'
@@ -257,7 +258,7 @@ module.exports = function (pool, sendmail, logger) {
         }
       })
     }).catch(err => {
-      logger.error("code: ", err.code, "message: ", err.sqlMessage)
+      logger.error("code: ", err.code, "message: ", err.sqlMessage || err.message)
       res.send({
         state: '001',
         msg: 'message.query_error'

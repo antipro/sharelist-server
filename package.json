@@ -4,7 +4,7 @@
   "description": "",
   "main": "index.js",
   "engines": {
-    "node": "8.9.4"
+    "node": ">22.0.0"
   },
   "dependencies": {
     "@sendgrid/mail": "^6.2.1",

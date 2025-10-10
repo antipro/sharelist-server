@@ -21,14 +21,12 @@ const logger = log4js.getLogger()
 var pool = require('./components/database')
 // get mail
 var sendmail = require('./components/mail').sendmail
-// get speech token
-var fetchToken = require('./components/baidutoken')
 // get express
 var app = require('./components/express')(pool, sendmail, logger)
 // init http server
 var http = require('http').Server(app)
 // prepare socket.io
-require('./components/socketio')(http, pool, sendmail, logger, fetchToken)
+require('./components/socketio')(http, pool, sendmail, logger)
 // start listening
 http.listen(process.env.PORT || 5000, () => {
   logger.debug('listening on *:%d', process.env.PORT || 5000)

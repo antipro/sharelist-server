@@ -5,7 +5,7 @@ const writeFile = promisify(fs.writeFile);
 let pool = require('../components/database')
 let subject = 'Your account has been deleted, thanks for your kindness.'
 
-;(async () => {
+(async () => {
   try {
     const tasks = await pool.promise(`SELECT a.id, a.state, a.content, DATE_FORMAT(a.ctime, \'%Y-%m-%d %H:%i:%s\') AS ctime, 
       DATE_FORMAT(a.notify_date, \'%Y-%m-%d\') AS notify_date, DATE_FORMAT(a.notify_time, \'%H:%i\') AS notify_time, 
@@ -25,7 +25,7 @@ let subject = 'Your account has been deleted, thanks for your kindness.'
     
     await writeFile('./test/export.html', html)
     console.log('The file has been saved!');
-    var c = require('child_process');
+    const c = require('child_process');
     c.exec('x-www-browser ./test/export.html');
     process.exit(0)
   } catch (err) {

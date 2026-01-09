@@ -25,7 +25,7 @@ CREATE TABLE IF NOT EXISTS `projects` (
   `editable` char(1) NOT NULL DEFAULT 'Y',
   `state` tinyint(2) NOT NULL DEFAULT '0',
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=19 DEFAULT CHARSET=utf8;
+) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8;
 
 -- Data exporting was unselected.
 -- Dumping structure for table sharelist.shares
@@ -36,7 +36,7 @@ CREATE TABLE IF NOT EXISTS `shares` (
   `control` char(3) NOT NULL DEFAULT 'R--',
   `ctime` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=72 DEFAULT CHARSET=utf8;
+) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8;
 
 -- Data exporting was unselected.
 -- Dumping structure for table sharelist.tasks
@@ -50,7 +50,7 @@ CREATE TABLE IF NOT EXISTS `tasks` (
   `notify_date` date DEFAULT NULL,
   `notify_time` time DEFAULT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=251 DEFAULT CHARSET=utf8;
+) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8;
 
 -- Data exporting was unselected.
 -- Dumping structure for table sharelist.users
@@ -66,7 +66,7 @@ CREATE TABLE IF NOT EXISTS `users` (
   `ctime` timestamp NULL DEFAULT NULL,
   PRIMARY KEY (`id`),
   UNIQUE INDEX `email` (`email`)
-) ENGINE=InnoDB AUTO_INCREMENT=9 DEFAULT CHARSET=utf8;
+) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8;
 
 -- Data exporting was unselected.
 -- Dumping structure for table sharelist.verifycodes
@@ -77,7 +77,7 @@ CREATE TABLE IF NOT EXISTS `verifycodes` (
   `code` varchar(50) NOT NULL,
   `expire` datetime NOT NULL,
   PRIMARY KEY (`id`)
-) ENGINE=InnoDB AUTO_INCREMENT=16 DEFAULT CHARSET=utf8;
+) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8;
 
 -- Data exporting was unselected.
 /*!40101 SET SQL_MODE=IFNULL(@OLD_SQL_MODE, '') */;

@@ -2,10 +2,10 @@
  * database pool function
  */
 var config = {
-  host: process.env.host,
-  user: process.env.user,
-  password: process.env.password,
-  database: process.env.database
+  host: process.env.host || 'localhost',
+  user: process.env.user || 'support',
+  password: process.env.password || 'support',
+  database: process.env.database || 'sharelist'
 }
 // init connnection pool of database
 const pool = require('mysql').createPool({

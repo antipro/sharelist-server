@@ -2,10 +2,10 @@
  * sendmail function
  */
 var config = {
-  mailuser: process.env.mailuser,
-  mailpwd: process.env.mailpwd,
-  smtpserver: process.env.smtpserver,
-  smtpport: parseInt(process.env.smtpport)
+  mailuser: process.env.mailuser || '',
+  mailpwd: process.env.mailpwd || '',
+  smtpserver: process.env.smtpserver || '',
+  smtpport: parseInt(process.env.smtpport) || 0
 }
 const email = require('emailjs')
 const util = require('util')
